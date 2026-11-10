@@ -172,6 +172,11 @@ app.update()
 rp = app.guide_route((0, 27))
 check('Route 112 (19,37) -> Meteor Falls: chặng đầu là FIERY PATH (%s)' % (rp[:2] if rp else None),
       rp and rp[0] == (0, 27) and app.rom.map_name(*rp[1]) == 'FIERY PATH')
+try:                                                   # tick_error 11/11 17:27: map rác lúc game dời SaveBlock
+    bad = app.route_from_here((200, 3), (5, 5), (24, 0))
+    check('map rác (200,3): không lỗi, trả None', bad is None)
+except Exception as e:
+    check('map rác (200,3): không lỗi (%s)' % e, False)
 qp = app.q_cv.find_withtag('qpath')
 co = app.q_cv.coords(qp[-1]) if qp else []
 k = app.q_scale * 16

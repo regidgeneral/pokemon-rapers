@@ -3110,6 +3110,9 @@ class App(tk.Tk):
         Route 112 phía dưới -> Fiery Path, không phải mép trên sang Route 113). None nếu không lối nào tới được đích."""
         from collections import deque
         st = self.story
+        maps = self.__dict__.get('_map_set') or self.__dict__.setdefault('_map_set', set(st.maps()))
+        if frm not in maps or goal not in maps:              # 11/11: đọc map lúc game dời SaveBlock (chuyển cảnh) ra mã rác
+            return None
         if frm == goal:
             return [frm]
         have_key = frozenset(getattr(self, 'q_have', None) or ())
@@ -3135,6 +3138,8 @@ class App(tk.Tk):
         while q and n < 80:
             node = q.popleft()
             m, ent = node
+            if m not in maps:                                  # cửa tới map động / rác
+                continue
             try:
                 R, info = region(m, ent), st.map_info(*m)
             except Exception:
