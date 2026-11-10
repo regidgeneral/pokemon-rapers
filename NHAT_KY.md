@@ -61,3 +61,14 @@
 - Hội đồng: gói A (đi lại tự do, không đụng cốt truyện, không cờ phá đảo, Duy tự dạy HM). Duy: "làm luôn".
 - Code: UNLOCK_* + Game.unlock_all (write_cas một khung hình, chỉ ở overworld), nút 🔓 sao lưu .sav trước.
   Bài thử t_unlock_fake 16/16. Lần đầu 2 SAI do túi giả 0x02027000 đè vùng cờ giả (sb1 giả + 0x1270) -> chuyển túi giả sang 0x02032000.
+
+## 2026-11-11 — "tool chưa tự lưu được": tự lưu Emerald + chấm IV
+- Duy hỏi thông báo "chưa tự lưu được". Log encounter_history: 762 lần gặp 09:17-11:09 (530 Magikarp, 223 Goldeen), không shiny.
+  11:08 tool bắt MAGIKARP Lv5 IV 28/14/28/28/25/31 (đang ở ô 4 đội) vì "IV có ích" 140/155 = 90% -> quan trọng -> muốn lưu, Emerald
+  chưa có con trỏ menu Start -> chỉ nhắc. Hai chỗ sai: chấm theo chỉ số gốc Magikarp (SpA 15 > Atk 10 -> coi SpA là chính, Gyarados
+  dùng Atk; con này Atk 14) và săn "Magikarp shiny" mà Magikarp thường vẫn tính quan trọng vì đúng loài.
+- Dò menu Start: quét EWRAM tìm dãy mã mục 0,1,2,4,5,6,7 -> 0x02037610, trước là số mục 7 (0x0203760F), con trỏ 2 (0x0203760E,
+  lần trước mở Túi). ROM tham chiếu 0x0203760E/0F/10 lần lượt 2/5/3 lần.
+- Sửa: hồ sơ start_menu; hunt_save_step tìm vị trí LƯU trong danh sách mục, bấm lên/xuống (không dựa vòng quanh); menu lạ -> dừng + báo.
+  Rom.grade_base (dạng tiến hoá cuối, nhiều nhánh lấy tổng cao nhất), mọi lời gọi iv_grade dùng nó. hunt_important: đúng loài chỉ tính
+  khi không đòi shiny. Bài thử t_save_fake 13/13 (con Magikarp 11:08 giờ chấm 129/155 Atk -> không bắt nữa); bài cũ qua hết.

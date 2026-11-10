@@ -43,7 +43,8 @@ IV_GRADES = ['Thường', 'Tạm', 'Nên bắt', 'Tuyệt vời']
 
 
 def iv_grade(iv, base):
-    """Đánh giá IV theo 5 chỉ số có ích: bỏ chỉ số tấn công không dùng (Atk vs SpA theo chỉ số gốc của loài).
+    """Đánh giá IV theo 5 chỉ số có ích: bỏ chỉ số tấn công không dùng (Atk vs SpA theo chỉ số gốc truyền vào;
+    nơi gọi truyền Rom.grade_base = chỉ số của dạng tiến hoá cuối).
     Trả (mức 0..3, tổng có ích, chỉ số tấn công chính 'Atk'/'SpA'). Thứ tự: HP Atk Def Spe SpA SpD."""
     phys = base[1] >= base[4]
     main, off = (1, 4) if phys else (4, 1)
@@ -1226,7 +1227,7 @@ class App(tk.Tk):
                     col = '#1565c0'
                 lb.config(text=texts[c], fg=col)
         ivs = sum(m.iv)
-        g, useful, main = iv_grade(m.iv, b)
+        g, useful, main = iv_grade(m.iv, r.grade_base(m.species))
         plain = p.grade.master.winfo_toplevel().cget('bg')            # Tạm/Thường: không nền, chữ xám
         fg, bg = (('#ffffff', '#1b7f2a'), ('#14501d', '#c8efc8'), ('gray', plain), ('gray', plain))[3 - g]
         p.grade.config(text='%s IV: %s — có ích %d/155 (%d%%)' % (
@@ -1304,7 +1305,7 @@ class App(tk.Tk):
     def hist_add(self, t, m, cnt):
         """Thêm một lần gặp vào đầu self.hist (mới nhất trước). t = 'YYYY-mm-dd HH:MM:SS'."""
         self.hist_seq = getattr(self, 'hist_seq', 0) + 1
-        g = iv_grade(m.iv, self.rom.base_stats(m.species))[0] if 1 <= m.species <= self.rom.max_species else 0
+        g = iv_grade(m.iv, self.rom.grade_base(m.species))[0] if 1 <= m.species <= self.rom.max_species else 0
         e = dict(id=self.hist_seq, t=t, m=m, cnt=cnt, g=g)
         self.hist.insert(0, e)
         self.__dict__.setdefault('hist_by_id', {})[e['id']] = e
@@ -1389,7 +1390,7 @@ class App(tk.Tk):
             if key not in self.seen and 1 <= m.level <= 100:
                 self.seen.add(key)
                 cnt = self.count_encounter(m, key)
-                g, useful, _ = iv_grade(m.iv, self.rom.base_stats(m.species))
+                g, useful, _ = iv_grade(m.iv, self.rom.grade_base(m.species))
                 e = self.hist_add(time.strftime('%Y-%m-%d %H:%M:%S'), m, cnt)
                 self.hist_save(e)
                 if self.hist_pass(e):
@@ -2425,7 +2426,7 @@ class App(tk.Tk):
         t.delete(*t.get_children())
         here = []
         for x in self.q_roam:
-            g, _, _ = iv_grade(x['iv'], self.rom.base_stats(x['species']))
+            g, _, _ = iv_grade(x['iv'], self.rom.grade_base(x['species']))
             name = self.rom.species_name(x['species'])
             at = x['map'] == self.q_cur
             if at:
@@ -2909,7 +2910,7 @@ class App(tk.Tk):
         if o['dex'] and dex and dex not in (self.game.caught_dex() or set()):
             return '📕 chưa có trong Pokédex'
         if o['iv']:
-            pct = 100 * iv_grade(m.iv, r.base_stats(m.species))[1] / 155
+            pct = 100 * iv_grade(m.iv, r.grade_base(m.species))[1] / 155
             if pct >= self.hunt_iv_pct:
                 return '✔ IV %d%%' % pct
         if self.hunt_target and m.species == self.hunt_target and \
@@ -3401,9 +3402,10 @@ class App(tk.Tk):
         r = self.rom
         if m.is_shiny_in_game() or m.species in self.__dict__.setdefault('_legend_set', set(legend_species(r))):
             return True
-        if iv_grade(m.iv, r.base_stats(m.species))[1] / 155 >= self.HUNT_SAVE_IV:
+        if iv_grade(m.iv, r.grade_base(m.species))[1] / 155 >= self.HUNT_SAVE_IV:
             return True
-        return bool(self.hunt_target) and m.species == self.hunt_target
+        # Duy 11/11: săn "loài X shiny" thì con X thường không tính (shiny đã trả True ở trên)
+        return bool(self.hunt_target) and m.species == self.hunt_target and not self.hunt_target_shiny.get()
 
     def hunt_catch_fail(self, m, msg):
         c = self.hunt['catch']
@@ -3468,8 +3470,6 @@ class App(tk.Tk):
                  (v, 3), (None, 4), (hz, 3), (None, 4), ('A', 3), (None, 60)])
 
     SAV_FILE = os.path.join(ROOT, 'Pokemon - Emerald Version (USA, Europe).sav')
-    START_MENU_CURSOR = None         # Emerald: chưa dò (FR 0x020370F4) -> không tự lưu sau khi bắt
-    START_MENU_SAVE = 4              # POKéDEX, POKéMON, Túi, <tên>, Lưu, CaiDat, Exit
 
     def _sav_mtime(self):
         try:
@@ -3491,9 +3491,15 @@ class App(tk.Tk):
             if not lock:                                      # menu chưa mở: mở lại
                 sv['stage'] = 0
                 return
-            cur = g.b.read(self.START_MENU_CURSOR, 1)[0]
-            n = (self.START_MENU_SAVE - cur) % 7
-            g.press([('DOWN', 3), (None, 12)] * n + [('A', 3), (None, 150)])
+            sm = self.prof.start_menu                         # Emerald: số mục đổi theo PokéNav -> tìm vị trí LƯU
+            cur, cnt = g.b.read(sm['cursor'], 2)
+            acts = list(g.b.read(sm['actions'], 9))[:cnt] if 0 < cnt <= 9 else []
+            if sm['save'] not in acts or cur >= cnt:
+                sv['t'] = 0                                   # menu lạ: báo bạn lưu tay (nhánh 60 giây bên dưới)
+            else:
+                idx = acts.index(sm['save'])
+                key = 'DOWN' if idx >= cur else 'UP'          # không dựa vào vòng quanh menu
+                g.press([(key, 3), (None, 12)] * abs(idx - cur) + [('A', 3), (None, 150)])
             sv['stage'], sv['a'] = 2, 0
         elif self._sav_mtime() != sv['mtime']:            # đã ghi file: đợi câu "đã lưu" tự đóng
             if not lock:
@@ -3525,7 +3531,7 @@ class App(tk.Tk):
         if got:
             self.hunt['caught'] = self.hunt.get('caught', 0) + 1
             self.say('✔ Đã bắt %s (%s) sau %d bóng. Săn tiếp…' % (c['name'], c['why'], c['thrown']))
-            if c.get('save') and self.START_MENU_CURSOR:      # Duy 07/11: bắt con quan trọng xong lưu game ngay
+            if c.get('save') and getattr(self.prof, 'start_menu', None):   # Duy 07/11: bắt con quan trọng xong lưu ngay
                 self.hunt['save'] = dict(stage=0, t=time.time(), mtime=self._sav_mtime(), name=c['name'])
             elif c.get('save'):                               # Emerald: chưa dò con trỏ menu Start -> nhắc lưu tay
                 self.alert('💾 Nhớ lưu game', 'Vừa bắt %s (%s), tool chưa tự lưu được ở Emerald' % (c['name'], c['why']),
@@ -3633,7 +3639,7 @@ class App(tk.Tk):
         self.quest_foe_detail()
         if foe:
             m, wild = foe
-            g, _, _ = iv_grade(m.iv, self.rom.base_stats(m.species))
+            g, _, _ = iv_grade(m.iv, self.rom.grade_base(m.species))
             txt = '⚔ Đang đối đầu%s: %s%s Lv %d  ·  HP %d/%d' % (
                 '' if wild else ' (trainer)', '★ ' if m.is_shiny_in_game() else '', self.rom.species_name(m.species),
                 m.level, m.hp, m.maxhp)

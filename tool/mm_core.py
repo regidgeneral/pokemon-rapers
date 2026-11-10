@@ -362,6 +362,9 @@ EMERALD = Profile(
     # 6 "Oh! A bite!" -> 7 chờ A (~0,5 giây, trễ = cá chạy), 8 có thể quay lại 3 thêm vòng chấm, 9-10 "on the hook!" chờ A,
     # 11-15 hỏng / cất cần. Đo thật: 2 -> 4 -> 7 -> 10 -> A -> vào trận.
     fishing=dict(tasks=0x03005E00, task_fn=0x0808C8C1, rods=(262, 263, 264), press_a=(6, 7)),
+    # Menu Start (dò 11/11 trong RAM thật: dãy mục 0,1,2,4,5,6,7 khi chưa có PokéNav; ROM tham chiếu 2/5/3 lần):
+    # con trỏ u8, số mục u8, mã hành động u8[9] (POKéDEX 0, POKéMON 1, Túi 2, PokéNav 3, tên 4, LƯU 5, tuỳ chọn 6, thoát 7)
+    start_menu=dict(cursor=0x0203760E, count=0x0203760F, actions=0x02037610, save=5),
     ball_pocket=1, master_ball=1, ultra_ball=2,
     registered_off=0x496,                                      # món đăng ký nút SELECT: u16 SaveBlock1 + 0x496
     sprite_front=0x08301418,                                   # {ptr LZ77, u16 size, u16 tag} theo loài
@@ -474,6 +477,27 @@ class Rom:
         b, s = self.profile.species_info
         o = self._o(b) + s * sp
         return list(self.d[o:o + 6])
+
+    def grade_base(self, sp):
+        """Chỉ số gốc để chấm IV: của dạng tiến hoá cuối (Magikarp -> Gyarados đánh bằng Atk, dù Magikarp có SpA > Atk);
+        nhiều nhánh thì lấy nhánh có tổng chỉ số gốc cao nhất (Duy 11/11)."""
+        cache = self.__dict__.setdefault('_grade_base', {})
+        if sp not in cache:
+            tb, per = self.profile.evo_table
+            seen, todo, leaves = {sp}, [sp], []
+            while todo:
+                s = todo.pop()
+                o, nxt = self._o(tb) + s * per * 8, []
+                for k in range(per):
+                    method, _, to = struct.unpack_from('<HHH', self.d, o + k * 8)
+                    if method and 1 <= to <= self.max_species and to not in seen:
+                        seen.add(to)
+                        nxt.append(to)
+                todo += nxt
+                if not nxt:
+                    leaves.append(s)
+            cache[sp] = self.base_stats(max(leaves, key=lambda s: (sum(self.base_stats(s)), -s)))
+        return cache[sp]
 
     def species_abilities(self, sp):
         """(ability 1, ability 2, ability ẩn) dạng ID."""
