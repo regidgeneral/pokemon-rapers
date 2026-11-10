@@ -74,17 +74,18 @@ check('ô hỏng -> loài 0', cell_species(bytes(bad)) == 0)
 check('tên loài', [rom.species_name(i) for i in (1, 25, 151, 277, 411)] == ['BULBASAUR', 'PIKACHU', 'MEW', 'TREECKO', 'CHIMECHO'])
 check('chỉ số Bulbasaur', rom.base_stats(1) == [45, 49, 49, 45, 65, 65])
 check('dex Treecko 252', rom.natdex(277) == 252)
-# Emerald Ý (dò 10/11): tên tiếng Ý trong ROM
-check('ability Bulbasaur = 65 (Overgrow)', rom.species_abilities(1)[0] == 65 and rom.ability_name(1) == 'TANFO')
-check('chiêu 1 Pound / 33 Tackle', rom.move_name(1) == 'BOTTA' and rom.move_power(33) == 35 and rom.move_pp(33) == 35)
+# Emerald Mỹ/Âu (dò 10/11)
+check('ability Bulbasaur', rom.ability_name(rom.species_abilities(1)[0]) == 'OVERGROW')
+check('chiêu 33 Tackle', rom.move_name(33) == 'TACKLE' and rom.move_power(33) == 35 and rom.move_pp(33) == 35)
 check('vật phẩm', rom.item_name(1) == 'MASTER BALL' and rom.item_pocket(1) == 2 and rom.item_pocket(259) == 5
-      and rom.item_name(376) == 'MAPPA STINTA')
+      and rom.item_name(376) == 'OLD SEA MAP')
 check('TM01 Focus Punch, HM01 Cut', struct.unpack_from('<H', rom.d, rom._o(EMERALD.tm_moves))[0] == 264
       and struct.unpack_from('<H', rom.d, rom._o(EMERALD.tm_moves) + 100)[0] == 15)
 check('EXP Lv 100 Medium Fast', rom.exp_for(0, 100) == 1000000 and rom.exp_for(5, 100) == 1250000)
 check('Bulbasaur tiến hoá Lv16', level_evolution(rom, 1, 16) == 2)
 check('Route 101 có Pokémon', rom.wild_for_map(0, 16) is not None)
-check('tên map', rom.map_name(0, 9) == 'ALBANOVA' and rom.map_name(0, 0) == 'PETALIPOLI' and rom.map_name(0, 16) == 'PERCORSO 101')
+check('tên map', rom.map_name(0, 9) == 'LITTLEROOT TOWN' and rom.map_name(0, 0) == 'PETALBURG CITY'
+      and rom.map_name(0, 16) == 'ROUTE 101')
 check('màu Bulbasaur', len(rom.palette(1)) == 16 and rom.palette(1) != rom.palette(1, True))
 check('ảnh mặt trước', rom.lz77(struct.unpack_from('<I', rom.d, rom._o(EMERALD.sprite_front) + 8)[0])[:1] is not None)
 print('Route 101:', rom.map_name(0, 16), [(rom.species_name(s), lo, hi) for lo, hi, s in rom.wild_for_map(0, 16)['land'][1]][:4])

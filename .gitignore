@@ -3,6 +3,7 @@
 *.sav
 *.sav.*
 *.rar
+*.zip
 # dữ liệu tool tự sinh
 __pycache__/
 tool/ipc/

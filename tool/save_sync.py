@@ -11,7 +11,7 @@ Hai bản lệch nhau: bản có GIỜ CHƠI lâu hơn thắng, bản thua cất
 import os, shutil, socket, struct, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SAV_NAME = '2207 - Pokemon - Versione Smeraldo (I)(Pokemon Rapers).sav'
+SAV_NAME = 'Pokemon - Emerald Version (USA, Europe).sav'
 REPO_FILE = 'save.sav'
 BRANCH = 'save'                      # save nằm ở nhánh riêng của repo GitHub; code ở nhánh chính (CodeSync)
 NO_WINDOW = 0x08000000 if os.name == 'nt' else 0

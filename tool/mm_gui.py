@@ -2595,8 +2595,8 @@ class App(tk.Tk):
             self.hunt_stop('Đã dừng săn.')
             return
         g = self.game
-        if not getattr(self.prof, 'ctl_action', None):        # Emerald Ý 10/11: chưa dò hàm trận đấu / câu cá
-            return self.hunt_refused('Săn chưa dùng được với Emerald (Ý): tool chưa biết địa chỉ màn chọn lệnh trong '
+        if not getattr(self.prof, 'ctl_action', None):        # Emerald 10/11: chưa dò hàm trận đấu / câu cá
+            return self.hunt_refused('Săn chưa dùng được với Emerald: tool chưa biết địa chỉ màn chọn lệnh trong '
                                      'trận và câu cá của bản này. Cần đo trong game trước.')
         try:
             g.keys_left()
@@ -3454,7 +3454,7 @@ class App(tk.Tk):
         g.press([('UP', 3), (None, 4), ('LEFT', 3), (None, 4), ('A', 3), (None, 20),    # Đánh
                  (v, 3), (None, 4), (hz, 3), (None, 4), ('A', 3), (None, 60)])
 
-    SAV_FILE = os.path.join(ROOT, '2207 - Pokemon - Versione Smeraldo (I)(Pokemon Rapers).sav')
+    SAV_FILE = os.path.join(ROOT, 'Pokemon - Emerald Version (USA, Europe).sav')
     START_MENU_CURSOR = 0x020370F4   # con trỏ menu đang mở (đo 07/11: mở Start = vị trí lần trước, 7 mục, vòng)
     START_MENU_SAVE = 4              # POKéDEX, POKéMON, Túi, <tên>, Lưu, CaiDat, Exit
 
@@ -4072,7 +4072,7 @@ class App(tk.Tk):
             self.say('Chưa kết nối: %s' % e, False)
 
 
-def already_running(name='PokemonToolEmeraldITA'):
+def already_running(name='PokemonToolEmerald'):
     """Đã có một tool đang chạy (mutex tên riêng của Windows) -> True. Lua tự mở tool mỗi lần nạp script."""
     if os.name != 'nt' or '--fake' in sys.argv:
         return False

@@ -17,3 +17,14 @@
   trainer 0x0830F9F4, ảnh mặt trước 0x08300DDC, màu 0x0830303C / shiny 0x08303DFC (cách nhau 440 × 8).
 - Không tìm được bảng cờ hành vi khối (sTileBitAttributes) trong ROM → ô gặp dùng danh sách hành vi pokeemerald, chưa kiểm.
 - Bài thử: t_frmon 519/519, t_box_fake 10/10, t_race_fake 4/4, t_gui_fake 0 lỗi, t_fish_fake bỏ qua; gen_sprites 411/411, xem ảnh đúng.
+
+## 2026-11-10 (chiều) — bỏ bản Ý, chuyển sang Emerald tiếng Anh
+- Duy hỏi "bản này không phải tiếng Anh hả" → bản Ý thật (BPEI, tên chiêu/map tiếng Ý). Duy chép `Pokemon - Emerald Version (USA, Europe).gba`:
+  BPEE, SHA1 f3ae088181bf583e55daf962a92bb46f4f1d07b7 = dump gốc. Duy chốt: bỏ bản Ý, làm bản Anh.
+- RAM y hệt bản Ý (đếm literal lại: 0x020244EC 1091, 0x03005D8C 829, khoá 0x03000F2C 3...).
+- ROM Anh: loài 0x083185C8, chiêu 0x0831977C, ability 0x0831B6DB, dữ liệu chiêu 0x0831C898, chỉ số 0x083203CC, EXP 0x0831F72C,
+  TM 0x08616040, natdex 0x0831DC82, tiến hoá 0x0832531C, vật phẩm 0x085839A0, hoang dã 0x08552D48, map groups 0x08486578,
+  khu vực 0x085A147C, điểm bay 0x0859F53C, trainer 0x08310030, lớp trainer 0x0830FCD4 (bản Anh đọc được, 13 byte),
+  ảnh 0x08301418, màu 0x08303678 / shiny 0x08304438. Hàm: CB2_Overworld 0x08085E5D, CB2_ReturnToField 0x080860C9, UseFly 0x080B69FD.
+- Lệnh xoá ROM Ý bị chặn (auto mode) → chuyển ROM Ý sang `E:\Pokemon\`. Thêm `*.zip` vào .gitignore (zip ROM Anh nằm trong folder).
+- Bài thử: t_frmon 519/519, box 10/10, race 4/4, gui 0 lỗi, fish bỏ qua; 411 ảnh, xem mẫu đúng.

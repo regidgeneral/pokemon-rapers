@@ -12,7 +12,7 @@ from mm_core import *
 app = mm_gui.App(fake=True)
 app.withdraw()
 g, p, b = app.game, app.prof, app.bridge
-if not getattr(p, 'fishing', None):                 # Emerald Ý 10/11: chưa dò task câu cá, săn đang tắt
+if not getattr(p, 'fishing', None):                 # Emerald 10/11: chưa dò task câu cá, săn đang tắt
     print('BỎ QUA: hồ sơ %s chưa có câu cá' % p.title)
     sys.exit(0)
 F = p.fishing

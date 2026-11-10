@@ -11,7 +11,7 @@ if errorlevel 1 (
   echo Dong bo loi ^(xem dong LOI o tren^). Van mo game voi save dang co tren may nay.
   pause
 )
-set "ROM=%~dp02207 - Pokemon - Versione Smeraldo (I)(Pokemon Rapers).gba"
+set "ROM=%~dp0Pokemon - Emerald Version (USA, Europe).gba"
 if not exist "%~dp0tool\sprites\fr\1.png" echo === Tao anh Pokemon lan dau ===
 if not exist "%~dp0tool\sprites\fr\1.png" py -3 gen_sprites.py
 set "MGBA="

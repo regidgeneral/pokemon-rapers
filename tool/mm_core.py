@@ -20,8 +20,7 @@ WATER_W = ROCK_W = [60, 30, 5, 4, 1]
 FISH_W = {'old': [70, 30], 'good': [60, 20, 20], 'super': [40, 40, 15, 4, 1]}
 
 CHARMAP = {0x00: ' ', 0xAB: '!', 0xAC: '?', 0xAD: '.', 0xAE: '-', 0xB4: "'", 0xBA: '/', 0x1B: 'é', 0xF0: ':',
-           0x01: 'À', 0x05: 'È', 0x06: 'É', 0x09: 'Ì', 0x0D: 'Ò', 0x11: 'Ù', 0x16: 'à', 0x1A: 'è', 0x1E: 'ì',
-           0x22: 'ò', 0x26: 'ù', 0xB5: '♂', 0xB6: '♀', 0xB8: ','}   # chữ Ý của bảng mã Gen 3 (Emerald ITA)
+           0x53: 'PK', 0x54: 'MN', 0xB5: '♂', 0xB6: '♀', 0xB8: ','}   # PK MN = chữ POKé MON trong tên lớp trainer
 CHARMAP.update({0xA1 + i: str(i) for i in range(10)})
 CHARMAP.update({0xBB + i: chr(65 + i) for i in range(26)})
 CHARMAP.update({0xD5 + i: chr(97 + i) for i in range(26)})
@@ -319,48 +318,49 @@ def fr_cell_species(cell):
 
 
 # ---------------------------------------------------------------- hồ sơ game
-# Emerald Ý (BPEI, dump "2207 ... (Pokemon Rapers)", SHA1 35bf7495...), dò 10/11:
-# - RAM trùng Emerald Mỹ: đếm literal trong ROM (gPlayerParty 0x020244EC 1091 lần, SaveBlock ptr 0x03005D8C...) và đối
-#   chiếu chỗ FR dùng cùng biến (đoạn code trước literal khớp -> đọc literal Emerald): warp, khoá điều khiển, gMapHeader.
-# - Bảng ROM dò theo nội dung (BULBASAUR, BOTTA, MASTER BALL, EXP 0/1/8/27, TM01 = 264, ALBANOVA, Route 101 = (0,16)...).
+# Emerald Mỹ/Âu (BPEE, "Pokemon - Emerald Version (USA, Europe)", SHA1 f3ae088181bf...), dò 10/11:
+# - RAM: đếm literal trong ROM (gPlayerParty 0x020244EC 1091 lần, SaveBlock ptr 0x03005D8C 829...) và đối chiếu chỗ FR
+#   dùng cùng biến (đoạn code trước literal khớp -> đọc literal Emerald): warp, khoá điều khiển, gMapHeader, gFieldCallback.
+# - Bảng ROM dò theo nội dung (BULBASAUR/IVYSAUR, POUND/KARATE CHOP, MASTER BALL/ULTRA BALL, EXP 0/1/8/27, TM01 = 264,
+#   LITTLEROOT TOWN, Route 101 = (0,16)...). Ảnh mặt trước = bảng ảnh lưng - 0x14A0, màu = ảnh lưng + 0xDC0.
 # - Hàm: callback overworld / quay lại map / FieldCallback_UseFly khớp thân hàm FR (che lệnh BL).
 # - CHƯA CÓ: hàm trận đấu (BattleMainCB2, controller chọn lệnh/chiêu), túi đồ, câu cá -> Săn tắt cho tới khi đo trong game.
 EMERALD = Profile(
-    key='em', title='Emerald (ITA)', code=b'BPEI', mon_cls=FrMon,
-    roms=['2207 - Pokemon - Versione Smeraldo (I)(Pokemon Rapers).gba'],
+    key='em', title='Emerald (USA)', code=b'BPEE', mon_cls=FrMon,
+    roms=['Pokemon - Emerald Version (USA, Europe).gba'],
     party_base=0x020244EC, enemy_base=0x02024744,
     sb1_ptr=0x03005D8C, sb2_ptr=0x03005D90, loc_off=4,
     money_off=0x490, key_off=0xAC, max_money=999_999,
     pockets_addr=0x02039DD8, pocket_fmt='<IB', n_pockets=5,    # gBagPockets: {ptr u32, capacity u8}
     pocket_names=['Vật phẩm', 'Poké Ball', 'TM/HM', 'Berry', 'Vật phẩm chính'],
     default_pocket=0, key_pocket=4, qty_max={},
-    species_names=(0x08317F8C, 11), move_names=(0x08319140, 13), ability_names=(0x0831B0DB, 13),
-    move_data=(0x0831C298, 12), move_off=(1, 3, 4),
-    item_recs=(0x0858000C, 44), item_name_off=0, item_pocket_off=26, item_pocket_shift=0,
+    species_names=(0x083185C8, 11), move_names=(0x0831977C, 13), ability_names=(0x0831B6DB, 13),
+    move_data=(0x0831C898, 12), move_off=(1, 3, 4),
+    item_recs=(0x085839A0, 44), item_name_off=0, item_pocket_off=26, item_pocket_shift=0,
     item_hold_off=18,
-    tm_moves=0x08612BDC, tm_count=50,                          # u16: 50 TM rồi 8 HM
-    species_info=(0x0831FDCC, 28),
+    tm_moves=0x08616040, tm_count=50,                          # u16: 50 TM rồi 8 HM
+    species_info=(0x083203CC, 28),
     sp_off=dict(types=6, catch=8, gender=16, friend=18, growth=19, abil=(22, 23, 26)),   # +26 = 0: Gen 3 không có ability ẩn
-    exp_table=0x0831F12C,
+    exp_table=0x0831F72C,
     max_species=411, max_item=376, max_move=355, shedinja=303,
-    wild_headers=0x0854FA8C, map_groups=0x084832BC,
-    area_ptr_table=(0x0859DEE8, 0),                            # gRegionMapEntries {x,y,w,h, ptr tên}, chỉ số = mapsec
+    wild_headers=0x08552D48, map_groups=0x08486578,
+    area_ptr_table=(0x085A147C, 0),                            # gRegionMapEntries {x,y,w,h, ptr tên}, chỉ số = mapsec
     sprite_dir='em', sprite_max=411,
-    natdex_table=0x0831D682,                                   # u16 theo (loài - 1); 252-276 (Unown cũ) = 387
+    natdex_table=0x0831DC82,                                   # u16 theo (loài - 1); 252-276 (Unown cũ) = 387
     dex_owned_sb2=(0x28, 52),                                  # Pokédex ở SaveBlock2 + 0x18: owned +0x10, seen +0x44
     dex_seen_sb1=(0x988, 0x3B24),                              # 2 bản sao "seen" ở SaveBlock1
-    battle_flag=(0x030022C0 + 0x439, 0x2), cb2_addr=0x030022C4, cb2_overworld=0x08085E71,   # gMain.inBattle, callback2
+    battle_flag=(0x030022C0 + 0x439, 0x2), cb2_addr=0x030022C4, cb2_overworld=0x08085E5D,   # gMain.inBattle, callback2
     battle_type=0x02022FEC, battle_mons=0x02024084, battle_ctl=0x03005D60,
     ball_pocket=1, master_ball=1, ultra_ball=2,
     registered_off=0x496,                                      # món đăng ký nút SELECT: u16 SaveBlock1 + 0x496
-    sprite_front=0x08300DDC,                                   # {ptr LZ77, u16 size, u16 tag} theo loài
-    pal_normal=[(0x0830303C, 0, 440)], pal_shiny=[(0x08303DFC, 0, 440)],
-    evo_table=(0x08324D1C, 5),                                 # 5 mục x 8 byte {u16 kiểu, param, loài đích, pad}
+    sprite_front=0x08301418,                                   # {ptr LZ77, u16 size, u16 tag} theo loài
+    pal_normal=[(0x08303678, 0, 440)], pal_shiny=[(0x08304438, 0, 440)],
+    evo_table=(0x0832531C, 5),                                 # 5 mục x 8 byte {u16 kiểu, param, loài đích, pad}
     party_count=0x020244E9,
-    flags_off=0x1270, trainer_table=0x0830F9F4,
+    flags_off=0x1270, trainer_table=0x08310030, trainer_class_names=0x0830FCD4,
     player_obj=0x02037350,
-    fly=dict(warp_dest=0x020322E4, field_cb=0x03005DAC, use_fly=0x080B6A11, cb2_return=0x080860DD, main_state=0x030026F8,
-             lock=0x03000F2C, heal_table=0x0859BF00, heal_count=22, map_type=0x02037318 + 0x17),
+    fly=dict(warp_dest=0x020322E4, field_cb=0x03005DAC, use_fly=0x080B69FD, cb2_return=0x080860C9, main_state=0x030026F8,
+             lock=0x03000F2C, heal_table=0x0859F53C, heal_count=22, map_type=0x02037318 + 0x17),
     # Kho PC: gPokemonStoragePtr -> 4 byte (box đang chọn) + 14 box x 30 ô x 80 byte (mã hoá như đội)
     storage_ptr=0x03005D94, box_slots=14 * 30, box_size=80,
 )
