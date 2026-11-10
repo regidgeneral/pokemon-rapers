@@ -539,7 +539,8 @@ class App(tk.Tk):
         b.write(sb2 + p.key_off, struct.pack('<I', 0x1234ABCD))
         b.write(sb1 + p.money_off, struct.pack('<I', 5000 ^ 0x1234ABCD))
         for i in range(p.n_pockets):
-            b.write(p.pockets_addr + 8 * i, struct.pack(p.pocket_fmt, 0x02027000 + 0x400 * i, 30).ljust(8, b'\0'))
+            # túi giả ở 0x02032000: ngoài SaveBlock1 giả (Emerald: cờ ở sb1 + 0x1270 = 0x0202805C) và kho giả
+            b.write(p.pockets_addr + 8 * i, struct.pack(p.pocket_fmt, 0x02032000 + 0x400 * i, 30).ljust(8, b'\0'))
         wm = self.rom.wild_maps()
         g, n = next(((a, c) for a, c, nm in wm if nm == 'ROUTE 1'), wm[0][:2])
         b.write(sb1 + p.loc_off, bytes([g, n]))
@@ -2268,6 +2269,8 @@ class App(tk.Tk):
         gs = ttk.Frame(self.q_nb)                                # 📖 Cốt truyện chính
         self.q_t_story = gs
         self.q_nb.add(gs, text='📖 Cốt truyện')
+        ttk.Button(gs, text='🔓 Mở khoá săn shiny', command=self.guard(self.quest_unlock_all)).pack(side='top', anchor='w',
+                                                                                                    padx=4, pady=(4, 0))
         self.q_stext = tk.Text(gs, wrap='word', font=('Segoe UI', 10), cursor='arrow', padx=8, pady=6, spacing1=2, spacing3=2)
         ssb = ttk.Scrollbar(gs, orient='vertical', command=self.q_stext.yview)
         self.q_stext.configure(yscrollcommand=ssb.set)
@@ -4044,6 +4047,26 @@ class App(tk.Tk):
                                                                                self.guard(self.quest_open)(m)))
         T.insert('end', '\nBấm một dòng để mở map nơi làm bước đó.', 'hint')
         T.configure(state='disabled')
+
+    def quest_unlock_all(self):
+        """Nút 🔓: sao lưu .sav rồi ghi gói A (Game.unlock_all). Chỉ đổi RAM: chưa lưu game thì tắt mGBA là mất."""
+        if not messagebox.askyesno('Mở khoá săn shiny', (
+                'Sẽ bật: 8 huy hiệu (dùng HM ngoài trận), giày chạy, Pokédex toàn quốc, Bay tới 16 thị trấn; thêm '
+                'HM01-08, 3 cần câu, Mach + Acro Bike, Go-Goggles (sa mạc), Devon Scope (Kecleon).\n\n'
+                'KHÔNG đụng cốt truyện, trainer, vật phẩm, huyền thoại; không tính là đã phá đảo. '
+                'Gym vẫn đánh được, cốt truyện vẫn chơi tiếp được.\n\n'
+                'File .sav được sao lưu vào save_backup trước. Làm tiếp?')):
+            return
+        if os.path.exists(self.SAV_FILE):
+            os.makedirs(os.path.join(ROOT, 'save_backup'), exist_ok=True)
+            with open(self.SAV_FILE, 'rb') as f:
+                data = f.read()
+            with open(os.path.join(ROOT, 'save_backup', time.strftime('%Y%m%d-%H%M%S') + '_truoc_mo_khoa.sav'), 'wb') as f:
+                f.write(data)
+        added = self.game.unlock_all()
+        self.quest_story()
+        self.say('Đã mở khoá%s. Dạy HM bằng đĩa trong ngăn TM/HM. Nhớ LƯU GAME.' %
+                 ('; thêm ' + ', '.join(added) if added else ''))
 
     # ------------------------------------------------------------ tab Tiền
     def _build_money(self, f):

@@ -46,7 +46,7 @@ b.write(sb1 + p.loc_off, bytes(gn))
 b.write(p.player_obj + 0x10, struct.pack('<hh', pos[0] + 7, pos[1] + 7))
 b.write(p.player_obj + 0x18, bytes([face]))
 key16 = g.key32() & 0xFFFF
-b.write(0x02027000 + 0x400 * p.key_pocket, struct.pack('<HH', 262, 1 ^ key16))
+b.write(0x02032000 + 0x400 * p.key_pocket, struct.pack('<HH', 262, 1 ^ key16))
 g.set_registered_item(99)                                   # món bạn đang đăng ký (giả)
 
 pressed, step = [], {'v': None}
@@ -99,7 +99,7 @@ b.write(p.player_obj + 0x18, bytes([face]))
 app.hunt_toggle()                                          # dừng
 check('dừng săn trả lại món đăng ký cũ', g.registered_item() == 99 and app.hunt is None)
 # không có cần câu
-b.write(0x02027000 + 0x400 * p.key_pocket, bytes(4))
+b.write(0x02032000 + 0x400 * p.key_pocket, bytes(4))
 app.hunt_toggle()
 check('không có cần thì từ chối', app.hunt is None)
 print('%d đúng, %d sai' % (ok, fail))

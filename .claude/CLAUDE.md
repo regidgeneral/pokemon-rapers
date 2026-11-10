@@ -26,7 +26,7 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 ## Lệnh (chạy trong `tool\`, kèm `PYTHONIOENCODING=utf-8` khi in ra file)
 | Việc | Lệnh |
 |---|---|
-| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (câu cá Emerald) |
+| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (câu cá Emerald) · `dev\t_unlock_fake.py` (mở khoá) |
 | Đọc game đang chạy | `py -3 dev\peek_em.py` / `dev\watch_em.py` |
 | Đồng bộ | `py -3 save_sync.py start` · `pull` · `push` · `status` · `code` |
 | Máy mới | `py -3 save_sync.py setup https://github.com/regidgeneral/pokemon-rapers.git` hoặc `CaiDat_LanDau.bat` |
@@ -52,5 +52,6 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 **☐ Săn + câu cá (11/11): đã đo trong game, đã code, CHƯA chạy thử bằng tool.** Task_Fishing 0x0808C8C1, bấm A ở bước 6-7 ("Oh! A bite!", ~0,5 giây) và ≥ 9. Trận: cb2 0x08038421, chọn lệnh 0x08057589 (sửa 11/11, 0x080597B5 = chờ chữ), chọn chiêu 0x08058B41 (chưa chắc), túi 0x081AAD5D / gBagPosition 0x0203CE58. Tự lưu sau khi bắt: TẮT (chưa dò con trỏ menu Start), chỉ nhắc lưu tay.
 Đo lại: `py -3 dev\watch_fish_em.py [giây]` (chỉ đọc), Duy tự câu/đánh tay.
 **✅ Hình nhân vật trên bản đồ (10/11):** ow_gfx 0x08505620 / ow_pals 0x0850BBC8, 245/245 hình vẽ được (Duy báo bản đồ chỉ có số tròn).
-**☐ Chưa dò:** roamer Latios/Latias.
+**Mở khoá săn shiny, gói A (11/11):** nút 🔓 ở tab 📖 Cốt truyện → `Game.unlock_all`: 8 huy hiệu, Bay 16 thị trấn, giày chạy, National Dex (cờ + biến 0x4046 + SaveBlock2), HM01-08, 3 cần, 2 xe đạp, Go-Goggles, Devon Scope. KHÔNG cờ phá đảo, không biến cốt truyện/cờ ẩn NPC/trainer/huyền thoại (Duy chốt). ☐ Chưa bấm thật. Gói B (tua cốt truyện từng chuỗi để mở huyền thoại) = làm riêng khi Duy cần.
+**☐ Chưa dò:** roamer Latios/Latias (game tự thả khi nói chuyện mẹ sau Đại sảnh Danh vọng, players_house.inc:438-446).
 **☐ Máy nhà:** chưa nối. **☐ Chưa có `so_do/`.**

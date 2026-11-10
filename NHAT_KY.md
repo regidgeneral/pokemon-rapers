@@ -50,3 +50,14 @@
 - Đọc lúc đứng ở menu: cb2 0x08038421, inBattle 2, controller[0] = 0x08057589 (11/11 lần). 0x08057589 đọc gMain (literal 0x030022C0),
   được gọi từ 0x0805C040. 0x080597B5 (lấy nhầm làm ctl_action) gọi từ 0x0805BFDC, đứng lúc chữ intro trận chờ A -> hàm chờ chữ.
   Sửa ctl_action = 0x08057589. Tỉ lệ dính 1/5: chưa rõ là "Not even a nibble" (game, 50% mỗi vòng) hay "got away" (A trễ) -> hỏi Duy.
+
+## 2026-11-11 — mở khoá săn shiny, gói A
+- Duy dán yêu cầu từ phiên FR (commit FR 6425db9). Đọc RAM: Petalburg, 0 huy hiệu, vừa có Pokédex, 165 cờ ẩn NPC đang bật.
+- Tra pokeemerald (sparse clone vào scratchpad): SYSTEM_FLAGS 0x860 (flags.h:1348), huy hiệu 0x867-0x86E (1359-1366),
+  VISITED 0x86F-0x87E (1370-1385), B_DASH 0x8C0 (1462), NATIONAL_DEX 0x896 (1414), GAME_CLEAR 0x864 (1354, 22 file script kiểm);
+  VAR_NATIONAL_DEX 0x4046 (vars.h:90) = 0x302, nationalMagic 0xDA, mode National (event_data.c:63-72; global.h:210, 527);
+  cờ SB1 +0x1270, biến +0x139C (global.h:1020-1021). Kecleon chỉ kiểm Devon Scope (kecleon.inc:51), sa mạc kiểm Go-Goggles
+  (Route111/scripts.inc:190). Latios/Latias: hall_of_fame.inc:44-45 đặt biến nhà = 3, mẹ bật TV thả roamer (players_house.inc:438-446).
+- Hội đồng: gói A (đi lại tự do, không đụng cốt truyện, không cờ phá đảo, Duy tự dạy HM). Duy: "làm luôn".
+- Code: UNLOCK_* + Game.unlock_all (write_cas một khung hình, chỉ ở overworld), nút 🔓 sao lưu .sav trước.
+  Bài thử t_unlock_fake 16/16. Lần đầu 2 SAI do túi giả 0x02027000 đè vùng cờ giả (sb1 giả + 0x1270) -> chuyển túi giả sang 0x02032000.

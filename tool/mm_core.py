@@ -368,7 +368,7 @@ EMERALD = Profile(
     pal_normal=[(0x08303678, 0, 440)], pal_shiny=[(0x08304438, 0, 440)],
     evo_table=(0x0832531C, 5),                                 # 5 mục x 8 byte {u16 kiểu, param, loài đích, pad}
     party_count=0x020244E9,
-    flags_off=0x1270, trainer_table=0x08310030, trainer_class_names=0x0830FCD4,
+    flags_off=0x1270, vars_off=0x139C, trainer_table=0x08310030, trainer_class_names=0x0830FCD4,   # global.h:1020-1021
     player_obj=0x02037350,
     ow_gfx=0x08505620, ow_pals=0x0850BBC8,                     # hình nhân vật: con trỏ GraphicsInfo theo gfx id; {ptr màu, tag}
     fly=dict(warp_dest=0x020322E4, field_cb=0x03005DAC, use_fly=0x080B69FD, cb2_return=0x080860C9, main_state=0x030026F8,
@@ -1036,6 +1036,22 @@ class FakeBridge(_Snapshot):
         return True
 
 
+# ---------------------------------------------------------------- mở khoá săn shiny, gói A (Duy chốt 11/11)
+# Số lấy từ pokeemerald (pret): include/constants/flags.h, vars.h, include/global.h, src/event_data.c; xem NHAT_KY 11/11.
+# Gói A = đi lại tự do, KHÔNG đụng cốt truyện: không cờ trainer/vật phẩm/huyền thoại, không cờ ẩn NPC, không biến cốt
+# truyện, KHÔNG bật FLAG_SYS_GAME_CLEAR (22 script kiểm cờ này và giả định cốt truyện đã xong). Vẫn chơi tiếp cốt truyện được.
+UNLOCK_FLAGS_SET = (
+    list(range(0x867, 0x86F))            # FLAG_BADGE01-08_GET (flags.h:1359-1366): dùng HM ngoài trận
+    + list(range(0x86F, 0x87F))          # FLAG_VISITED_* 16 thị trấn (flags.h:1370-1385): Bay
+    + [0x8C0,                            # FLAG_SYS_B_DASH (flags.h:1462): giày chạy
+       0x896])                           # FLAG_SYS_NATIONAL_DEX (flags.h:1414), cùng biến + SaveBlock2 bên dưới
+UNLOCK_VARS = {0x4046: 0x302}            # VAR_NATIONAL_DEX (vars.h:90) = 0x302 (event_data.c:67)
+NATDEX_BYTES = (0x18, bytes([0, 1, 0xDA]))   # SaveBlock2.pokedex: order 0, mode 1 = National, nationalMagic 0xDA (event_data.c:66-70)
+# HM01-08, Old/Good/Super Rod, Mach + Acro Bike, Go-Goggles (sa mạc Route 111: Route111/scripts.inc:190),
+# Devon Scope (Kecleon chặn Route 119/120 + gym Fortree: kecleon.inc:51, FortreeCity/scripts.inc:58). Mã đọc từ ROM theo tên.
+UNLOCK_ITEMS = (339, 340, 341, 342, 343, 344, 345, 346, 262, 263, 264, 259, 272, 279, 288)
+
+
 # ---------------------------------------------------------------- trạng thái game
 class Game:
     def __init__(self, bridge, rom):
@@ -1254,6 +1270,37 @@ class Game:
         def get(f):
             return raw[f >> 3] >> (f & 7) & 1 if 0 <= f >> 3 < len(raw) else None
         return get
+
+    def unlock_all(self):
+        """Gói mở khoá (UNLOCK_*): cờ + biến + National Dex ghi trong một khung hình, chỉ khi RAM còn y lúc đọc (game
+        đổi giữa chừng thì đọc lại, thử lại); xong thì thêm vật phẩm còn thiếu. Trả về tên vật phẩm đã thêm."""
+        self._require_overworld()
+        n = 0x12C                                              # NUM_FLAG_BYTES Emerald (0x1270..0x139C)
+        for _ in range(5):
+            sb1, sb2 = self.sb1(), self.sb2()
+            fa, va = sb1 + self.p.flags_off, sb1 + self.p.vars_off
+            old = self.b.read(fa, n)
+            new = bytearray(old)
+            for f in UNLOCK_FLAGS_SET:
+                new[f >> 3] |= 1 << (f & 7)
+            items = [(fa, old, bytes(new))]
+            for v, val in UNLOCK_VARS.items():
+                a = va + 2 * (v - 0x4000)
+                items.append((a, self.b.read(a, 2), struct.pack('<H', val)))
+            a = sb2 + NATDEX_BYTES[0]
+            items.append((a, self.b.read(a, len(NATDEX_BYTES[1])), NATDEX_BYTES[1]))
+            if self.b.write_cas(items):
+                break
+            time.sleep(0.05)
+        else:
+            raise ValueError('Cờ trong game đổi liên tục, chưa ghi được. Đứng yên rồi thử lại.')
+        have = {i for k in range(self.p.n_pockets) for i, q in self.read_pocket(k) if q}
+        added = []
+        for it in UNLOCK_ITEMS:
+            if it not in have:
+                self.set_item(it, 1)
+                added.append(self.rom.item_name(it))
+        return added
 
     def player_xy(self):
         """Ô người chơi đang đứng trên map (toạ độ object trừ lề 7 ô)."""
