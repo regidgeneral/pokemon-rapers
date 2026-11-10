@@ -1372,6 +1372,25 @@ class Game:
             self.b.write(self.p.battle_mons + 0x28, struct.pack('<H', mx))
         return mx
 
+    STATUS_NAMES = ((0x7, 'ngủ'), (0x8, 'độc'), (0x10, 'bỏng'), (0x20, 'đóng băng'), (0x40, 'tê liệt'), (0x80, 'độc nặng'))
+
+    def cure_battle_status(self):
+        """Duy 11/11 (mọi trận khi bật Tự hồi): lúc game chờ chọn lệnh, xoá trạng thái xấu (status1: ngủ/độc/bỏng/đóng
+        băng/tê liệt) của con mình đang ra trận (gBattleMons[0], trận đôi thêm [2]; struct 0x58 byte, status1 +0x4C).
+        Ghi có điều kiện (RAM còn y lúc đọc). Trả về [(tên loài, tên trạng thái)] đã xoá."""
+        p = self.p
+        if self.b.read_u32(p.battle_ctl) != p.ctl_action:
+            return []
+        slots = (0, 2) if self.b.read(p.battle_type, 1)[0] & 1 else (0,)
+        out = []
+        for k in slots:
+            a = p.battle_mons + 0x58 * k
+            sp, st = struct.unpack('<H', self.b.read(a, 2))[0], self.b.read(a + 0x4C, 4)
+            v = struct.unpack('<I', st)[0]
+            if v and 1 <= sp <= self.rom.max_species and self.b.write_cas([(a + 0x4C, st, bytes(4))]):
+                out.append((self.rom.species_name(sp), ', '.join(n for m, n in self.STATUS_NAMES if v & m) or 'trạng thái'))
+        return out
+
     def ball_index(self, item):
         """(vị trí của bóng trong ngăn Poké Ball, số món trong ngăn, số lượng bóng); vị trí None nếu hết."""
         items = [(i, q) for i, q in self.read_pocket(self.p.ball_pocket) if i and q]

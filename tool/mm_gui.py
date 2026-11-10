@@ -426,7 +426,8 @@ class App(tk.Tk):
         m = tk.Menu(mb, tearoff=0)
         mb['menu'] = m
         save = self.save_area_state
-        m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận', variable=self.auto_heal, command=save)
+        m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận + xoá trạng thái xấu trong trận', variable=self.auto_heal,
+                          command=save)
         m.add_separator()
         m.add_checkbutton(label='Báo khi gặp shiny / nên bắt (kêu + khung nổi, không lấy phím của mGBA)',
                           variable=self.alert_on, command=save)
@@ -1429,6 +1430,10 @@ class App(tk.Tk):
                 foes = [m for m in self.game.enemy_party() if not m.empty and m.checksum_ok]
                 self.exp_snap = ([m for m in self.game.party() if not m.empty], foes) if foes else None
             self.was_battle = True
+            if self.auto_heal.get():                             # Duy 11/11: mọi trận, xoá trạng thái xấu ngay trong trận
+                cured = self.game.cure_battle_status()
+                if cured:
+                    self.say('💊 Trong trận: ' + ' · '.join('%s hết %s' % c for c in cured))
             return
         if self.exp_snap:                                        # cờ trong trận tắt = EXP đã chia xong, không chờ overworld
             self.finish_exp()

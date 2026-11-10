@@ -72,3 +72,10 @@
 - Sửa: hồ sơ start_menu; hunt_save_step tìm vị trí LƯU trong danh sách mục, bấm lên/xuống (không dựa vòng quanh); menu lạ -> dừng + báo.
   Rom.grade_base (dạng tiến hoá cuối, nhiều nhánh lấy tổng cao nhất), mọi lời gọi iv_grade dùng nó. hunt_important: đúng loài chỉ tính
   khi không đòi shiny. Bài thử t_save_fake 13/13 (con Magikarp 11:08 giờ chấm 129/155 Atk -> không bắt nữa); bài cũ qua hết.
+
+## 2026-11-11 — xoá trạng thái xấu trong trận
+- Duy gửi ảnh: Treecko Lv13 ngủ (SLP) khi đánh SHROOMISH ở Petalburg Woods (Effect Spore), tool chỉ hồi sau trận.
+  Hỏi phạm vi -> Duy chốt "mọi trận" (khi bật Tự hồi).
+- Đọc thật trước khi ghi: ctl 0x08057589 (chọn lệnh), TREECKO HP 42/45 khớp ảnh, status1 (+0x4C) = 0x2, status2 = 0.
+- Code: Game.cure_battle_status (chỉ khi ctl = chọn lệnh, write_cas status1 -> 0, trận đôi thêm ô 2), tick_battle gọi khi bật Tự hồi,
+  báo "💊 Trong trận: X hết ngủ". Chạy thật 1 lần: [('TREECKO', 'ngủ')], status1 sau = 0. Bài thử t_status_fake 7/7, bài cũ qua hết.
