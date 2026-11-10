@@ -359,6 +359,7 @@ EMERALD = Profile(
     party_count=0x020244E9,
     flags_off=0x1270, trainer_table=0x08310030, trainer_class_names=0x0830FCD4,
     player_obj=0x02037350,
+    ow_gfx=0x08505620, ow_pals=0x0850BBC8,                     # hình nhân vật: con trỏ GraphicsInfo theo gfx id; {ptr màu, tag}
     fly=dict(warp_dest=0x020322E4, field_cb=0x03005DAC, use_fly=0x080B69FD, cb2_return=0x080860C9, main_state=0x030026F8,
              lock=0x03000F2C, heal_table=0x0859F53C, heal_count=22, map_type=0x02037318 + 0x17),
     # Kho PC: gPokemonStoragePtr -> 4 byte (box đang chọn) + 14 box x 30 ô x 80 byte (mã hoá như đội)

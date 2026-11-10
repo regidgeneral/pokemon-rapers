@@ -28,3 +28,9 @@
   ảnh 0x08301418, màu 0x08303678 / shiny 0x08304438. Hàm: CB2_Overworld 0x08085E5D, CB2_ReturnToField 0x080860C9, UseFly 0x080B69FD.
 - Lệnh xoá ROM Ý bị chặn (auto mode) → chuyển ROM Ý sang `E:\Pokemon\`. Thêm `*.zip` vào .gitignore (zip ROM Anh nằm trong folder).
 - Bài thử: t_frmon 519/519, box 10/10, race 4/4, gui 0 lỗi, fish bỏ qua; 411 ảnh, xem mẫu đúng.
+
+## 2026-11-10 — vẽ nhân vật trên bản đồ
+- Duy gửi ảnh: bản đồ Littleroot chỉ có số tròn thay NPC → hồ sơ thiếu ow_gfx/ow_pals.
+- Dò: bảng con trỏ GraphicsInfo 0x08505620 (mục 0 Brendan 16x32, tag màu 0x1100, 1 tham chiếu), bảng màu {ptr, tag} 0x0850BBC8
+  (tag 0x1103, 0x1104... 0x1100, 0x1101). Gfx 94/140/141 cỡ 48x48 / 96x40 / 88x32 (xe tải, tàu, bóng) → nới điều kiện cỡ trong
+  ow_sprite thành bội 8, ≤ 128. 245/245 hình vẽ được, xem mẫu đúng. t_frmon thêm 1 kiểm (520/520).

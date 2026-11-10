@@ -567,7 +567,7 @@ class Story:
             p = self.p
             gi = self.u32(p.ow_gfx + 4 * gfx)
             tt, pt, rt, size, w, h = struct.unpack_from('<HHHHhh', self.d, self.o(gi))
-            if tt == 0xFFFF and w in (16, 32, 64) and h in (16, 32, 64):
+            if tt == 0xFFFF and 0 < w <= 128 and 0 < h <= 128 and not w % 8 and not h % 8:   # Emerald có xe/tàu 48x48, 96x40, 88x32
                 pal = None
                 for k in range(512):
                     ptr, tag = self.u32(p.ow_pals + 8 * k), self.u16(p.ow_pals + 8 * k + 4)

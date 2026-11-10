@@ -50,5 +50,6 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 **✅ Bài thử (10/11, bản Anh):** t_frmon 519/519 (tên, Route 101, màu, tiến hoá), t_box_fake 10/10, t_race_fake 4/4, t_gui_fake 0 lỗi; 411 ảnh Pokémon đúng.
 **☐ Chưa kiểm trong game thật:** mọi thứ (đọc đội/kho/túi/tiền/map, nhận trận, Bay). Chưa có `.sav`, chưa chạy Choi.bat lần nào.
 **☐ Tắt chờ đo trong game:** Săn tự bắt + câu cá (cần BattleMainCB2, controller chọn lệnh/chiêu, callback túi, task câu cá Emerald — câu cá Emerald có pha bấm A kịp lúc, khác FR). Nút Săn báo chưa dùng được.
-**☐ Chưa dò:** hình nhân vật overworld (ow_gfx/ow_pals), roamer Latios/Latias.
+**✅ Hình nhân vật trên bản đồ (10/11):** ow_gfx 0x08505620 / ow_pals 0x0850BBC8, 245/245 hình vẽ được (Duy báo bản đồ chỉ có số tròn).
+**☐ Chưa dò:** roamer Latios/Latias.
 **☐ Máy nhà:** chưa nối. **☐ Chưa có `so_do/`.**
