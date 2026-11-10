@@ -117,3 +117,14 @@
   lọc map), Story.flag_setters (quét mọi script 1 lần 0,4 giây: tự tìm ra cờ 0x372 <- NPC (5,5) map (9,0)), walk_path(blocked=...),
   App.quest_route_now / quest_block_text (⚠ CÓ NPC ĐỨNG CHẮN ĐƯỜNG + [xem chỗ đó]) / ✖ đỏ. Bấm xem bước khác cũng có ★ (q_view_step).
   Mục LỐI ĐI: "Hướng/Đi về phía Bắc" -> "Ra khỏi map / Dive". t_quest_fake 22/22 (thêm ca đúng ảnh), bài cũ qua hết.
+
+## 2026-11-11 — nhiệm vụ dạng chuỗi điều kiện (mục tiêu -> việc cần -> có/thiếu)
+- Duy: "nhìn vào là biết sẽ làm gì, như dùng Rock Smash cần bao nhiêu huy hiệu, lấy ở đâu; giờ nhìn còn rối". Trình bố cục mẫu, Duy: làm luôn.
+- gen_quest viết lại: 17 chương (mục tiêu lớn), bước gym có badge=n, needs (hm/item/badges). HMS: đĩa, chiêu, huy hiệu dùng ngoài trận
+  (Cut 1, Flash 2, Rock Smash 3, Strength 4, Surf 5, Fly 6, Dive 7, Waterfall 8), nơi nhận (Cut: nhà Rustboro 7,5; Flash: Granite 1F
+  36,9; Strength: Rusturf Tunnel 23,5 sau khi đập đá; ...). ITEMS: Devon Goods 269, Thư 274, Devon Scope 288, Magma Emblem 375, Mach Bike 259.
+- Route 111: tìm đường thật từ mép Mauville (12,139) tới đoạn mép nối Route 112 (offset 20, cao 60) bắt buộc qua đá (18,101); coi đá là
+  vật cản thì không có đường -> Rock Smash BẮT BUỘC (trước ghi tuỳ chọn = sai), Meteor Falls needs rocksmash.
+- GUI: quest_needs (túi, cờ huy hiệu 0x866+n, chiêu đội), quest_next_text = 🎯 MỤC TIÊU + CHUỖI VIỆC + TIẾP THEO, q_need_tgt (đường tím
+  tới thứ thiếu đầu tiên), q_pick (🧭), chi tiết map thu gọn (không chấm số trên bản đồ khi thu). quest_where: "(trong nhà)" chỉ khi trùng
+  tên thị trấn/route nhóm 0 (hang nhiều tầng không ghi). dev/show_quest_fake.py in thử tab Việc. t_quest_fake 33/33; mọi bài thử qua.

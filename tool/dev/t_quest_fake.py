@@ -48,11 +48,13 @@ def prog(done_idx):
     return mm_quest.progress(lambda f: f in fl, lambda v: vr.get(v, 0))[1]
 
 
-opt = next(i for i, s in enumerate(S) if s.get('optional'))
+rs = next(i for i, s in enumerate(S) if s['done'] == ('f', mm_quest.HMS['rocksmash']['got']))
+check('Rock Smash là bước bắt buộc (đá chắn Route 111 ô 18,101) + Meteor Falls cần HM rocksmash',
+      not S[rs].get('optional') and ('hm', 'rocksmash') in S[rs + 1].get('needs', []))
 check('chưa làm gì -> bước 1', prog([]) == 0)
 check('xong 11 bước đầu -> bước 12 (Dock ở xưởng tàu)', prog(range(11)) == 11 and S[11]['who'].startswith('Dock'))
 check('xong Dock -> bước 13 (Captain Stern)', prog(range(12)) == 12 and S[12]['who'] == 'Captain Stern')
-check('bỏ bước tuỳ chọn (Rock Smash) -> đi tiếp bước sau nó', prog([i for i in range(opt + 1) if i != opt]) == opt + 1)
+check('chưa lấy Rock Smash -> chỉ bước Rock Smash', prog(range(rs)) == rs)
 check('làm khác thứ tự: bước sau xong -> chỉ bước sau nữa', prog([0, 1, 2, 5]) == 6)
 check('xong hết -> None', prog(range(len(S))) is None)
 
@@ -70,11 +72,19 @@ for s in S[:11]:
 b.write(sb1 + p.loc_off, bytes([0, 1]))                       # SLATEPORT CITY
 b.write(p.player_obj + 0x10, struct.pack('<hh', 21 + 7, 15 + 7))
 b.write(p.cb2_addr, struct.pack('<I', p.cb2_overworld))
+key16 = g.key32() & 0xFFFF
+kp = g.pocket_info(p.key_pocket)[0]
+b.write(kp, struct.pack('<HH', 269, 1 ^ key16) + bytes(4 * 29))   # túi chính: Devon Goods (như save thật)
 app.q_follow.set(True)
 app.quest_tick(force=True)
 app.update()
 txt = app.q_text.get('1.0', 'end')
-check('tab Việc: "BƯỚC TIẾP THEO (12/%d)" + Dock' % len(S), 'BƯỚC TIẾP THEO (12/%d)' % len(S) in txt and 'Dock' in txt)
+check('tab Việc: 🎯 MỤC TIÊU = chương Captain Stern, ➜ nói chuyện với Dock',
+      '🎯 MỤC TIÊU: Giao Devon Goods cho Captain Stern' in txt and '➜ Vào xưởng tàu Stern, nói chuyện với Dock' in txt)
+check('tab Việc: chuỗi có ✔ Briney (xong) và ⬜ bảo tàng + ✔ Có Devon Goods trong túi',
+      '✔ Nhờ ông Briney chở tới Slateport' in txt and '⬜ Vào bảo tàng tầng 2' in txt and '✔ Có Devon Goods trong túi' in txt)
+check('tab Việc: danh sách theo map thu gọn', '▸ Chi tiết map này' in txt and 'CÒN TRÊN MAP NÀY' not in txt
+      and not app.q_marks)
 check('tab Việc: không còn chữ chỉ hướng (mép Đông / sang phải...)',
       not any(w in txt for w in ('mép Đông', 'mép Tây', 'mép Bắc', 'mép Nam', 'sang phải', 'sang trái', 'lên trên', 'xuống dưới')))
 check('tab Việc: có chặng đường tới xưởng tàu', 'ĐƯỜNG ĐI' in txt and 'vào cửa' in txt)
@@ -103,7 +113,7 @@ app.q_nb.select(0)
 app.quest_home()
 app.update()
 txt = app.q_text.get('1.0', 'end')
-check('bước 13 Captain Stern', 'BƯỚC TIẾP THEO (13/%d)' % len(S) in txt)
+check('bước 13 Captain Stern', '➜ Vào bảo tàng tầng 2' in txt and '✔ Vào xưởng tàu Stern' in txt)
 check('báo NPC chắn đường + phải nói chuyện với NPC ô 5,5 (Dock) ở Slateport',
       'CHẮN ĐƯỜNG' in txt and 'nói chuyện với NPC ở ô 5,5' in txt)
 blk = app.q_cv.find_withtag('qblk')
@@ -115,6 +125,49 @@ app.q_nb.select(app.q_t_story)
 app.quest_story()
 stxt = app.q_stext.get('1.0', 'end')
 check('tab Cốt truyện: 12 ✔, ➜ ở bước 13', stxt.count('✔') == 12 and '➜ 13.' in stxt)
+
+# 4) chuỗi HM (Duy 11/11: "muốn dùng Rock Smash thì cần mấy huy hiệu, lấy ở đâu"): bước Meteor Falls cần Rock Smash
+mf = next(i for i, s in enumerate(S) if s['map'] == (24, 0))          # METEOR FALLS
+for s in S[:mf]:
+    if s['done'][0] == 'f':
+        f = s['done'][1]
+        b.write(fa + (f >> 3), bytes([b.read(fa + (f >> 3), 1)[0] | 1 << (f & 7)]))
+    else:
+        b.write(va + 2 * (s['done'][1] - 0x4000), struct.pack('<H', s['done'][2]))
+
+
+class M:                                                     # con trong đội giả: chỉ cần loài + chiêu
+    def __init__(self, sp, moves):
+        self.species, self.moves, self.empty, self.checksum_ok = sp, moves, False, True
+
+
+real_party = g.party
+g.party = lambda: [M(279, [33, 0, 0, 0])]                    # GROVYLE chưa biết Rock Smash
+app.q_nb.select(0)
+app.quest_home()
+app.update()
+txt = app.q_text.get('1.0', 'end')
+check('Meteor Falls: 🎯 chương Mt. Chimney, ➜ Meteor Falls', '🎯 MỤC TIÊU: Chặn Team Magma' in txt and '➜ Tới Meteor Falls' in txt)
+check('⬜ HM06 Rock Smash trong túi — nhận ở nhà Mauville', '⬜ HM06 Rock Smash trong túi — nhận: người trong nhà ở Mauville' in txt)
+check('⬜ Huy hiệu 3 (Wattson) — mới dùng được ngoài trận', '⬜ Huy hiệu 3 (Wattson) — mới dùng được ROCK SMASH ngoài trận' in txt)
+check('⬜ chưa con nào biết Rock Smash', '⬜ Chưa con nào trong đội biết ROCK SMASH' in txt)
+check('đường tím tự dẫn tới thứ thiếu đầu tiên (nhà Mauville có HM06)',
+      app.guide_goal()[:2] == (mm_quest.HMS['rocksmash']['map'], mm_quest.HMS['rocksmash']['xy']))
+tm = g.pocket_info(app.rom.item_pocket(344) - 1)[0]
+b.write(tm, struct.pack('<HH', 344, 1 ^ key16))               # có HM06
+f = 0x866 + 3
+b.write(fa + (f >> 3), bytes([b.read(fa + (f >> 3), 1)[0] | 1 << (f & 7)]))   # có huy hiệu 3
+g.party = lambda: [M(279, [33, 249, 0, 0])]                   # Grovyle đã học Rock Smash
+app.quest_home()
+app.update()
+txt = app.q_text.get('1.0', 'end')
+check('đủ hết: ✔ HM06, ✔ huy hiệu 3, ✔ %s biết' % r.species_name(279), '✔ HM06 Rock Smash trong túi' in txt
+      and '✔ Huy hiệu 3' in txt and '✔ %s biết ROCK SMASH' % r.species_name(279) in txt)
+check('đủ hết: đường tím dẫn thẳng tới Meteor Falls', app.guide_goal()[:2] == (S[mf]['map'], S[mf]['xy']))
+app.quest_pick_go((S[mf]['map'], (1, 1), 'thử'))
+check('bấm 🧭 một dòng: đường tím đổi theo', app.guide_goal() == (S[mf]['map'], (1, 1), 'thử'))
+g.party = real_party
+
 app.q_guide.set(False)
 app.quest_home()
 app.update()
