@@ -324,7 +324,8 @@ def fr_cell_species(cell):
 # - Bảng ROM dò theo nội dung (BULBASAUR/IVYSAUR, POUND/KARATE CHOP, MASTER BALL/ULTRA BALL, EXP 0/1/8/27, TM01 = 264,
 #   LITTLEROOT TOWN, Route 101 = (0,16)...). Ảnh mặt trước = bảng ảnh lưng - 0x14A0, màu = ảnh lưng + 0xDC0.
 # - Hàm: callback overworld / quay lại map / FieldCallback_UseFly khớp thân hàm FR (che lệnh BL).
-# - CHƯA CÓ: hàm trận đấu (BattleMainCB2, controller chọn lệnh/chiêu), túi đồ, câu cá -> Săn tắt cho tới khi đo trong game.
+# - Hàm trận đấu, túi, câu cá: đo trong game 11/11 (xem ghi chú ở cb2_battle / fishing). Chưa có: con trỏ menu Start
+#   (tự lưu sau khi bắt con quan trọng đang tắt, chỉ báo bạn lưu tay).
 EMERALD = Profile(
     key='em', title='Emerald (USA)', code=b'BPEE', mon_cls=FrMon,
     roms=['Pokemon - Emerald Version (USA, Europe).gba'],
@@ -351,6 +352,14 @@ EMERALD = Profile(
     dex_seen_sb1=(0x988, 0x3B24),                              # 2 bản sao "seen" ở SaveBlock1
     battle_flag=(0x030022C0 + 0x439, 0x2), cb2_addr=0x030022C4, cb2_overworld=0x08085E5D,   # gMain.inBattle, callback2
     battle_type=0x02022FEC, battle_mons=0x02024084, battle_ctl=0x03005D60,
+    # Đo trong game 11/11 (dev\watch_fish_em.py, Duy câu tay 2 trận): callback2 trong trận / túi trong trận,
+    # gBattlerControllerFuncs[0] lúc chờ chọn lệnh / chọn chiêu. gBagPosition: {cb, u8 location, u8 ngăn, u16,
+    # u16 con trỏ[5] +8, u16 cuộn[5] +0x12} (đọc thật: location 1 = trận, ngăn 1 = Poké Ball).
+    cb2_battle=0x08038421, cb2_bag=0x081AAD5D, ctl_action=0x080597B5, ctl_move=0x08058B41, bag_state=0x0203CE58,
+    # Câu cá: Task_Fishing 0x0808C8C1 chạy bảng 16 bước 0x0849755C (data[0] = bước). Emerald: 4 = dấu chấm (bấm A = hỏng),
+    # 6 "Oh! A bite!" -> 7 chờ A (~0,5 giây, trễ = cá chạy), 8 có thể quay lại 3 thêm vòng chấm, 9-10 "on the hook!" chờ A,
+    # 11-15 hỏng / cất cần. Đo thật: 2 -> 4 -> 7 -> 10 -> A -> vào trận.
+    fishing=dict(tasks=0x03005E00, task_fn=0x0808C8C1, rods=(262, 263, 264), press_a=(6, 7)),
     ball_pocket=1, master_ball=1, ultra_ball=2,
     registered_off=0x496,                                      # món đăng ký nút SELECT: u16 SaveBlock1 + 0x496
     sprite_front=0x08301418,                                   # {ptr LZ77, u16 size, u16 tag} theo loài
@@ -1299,22 +1308,22 @@ class Game:
         return None, len(items), 0
 
     def set_bag_cursor(self, idx, n):
-        """Ghi gBagMenuState để lần mở Túi tới đặt con trỏ đúng món idx của ngăn Poké Ball (n món + dòng Huỷ)."""
+        """Ghi gBagPosition để lần mở Túi tới mở đúng ngăn Poké Ball, con trỏ ở đầu ngăn. Emerald: chưa đo số dòng
+        hiện được nên không đặt thẳng món idx; hunt_catch bấm xuống tới đúng món (theo bag_cursor)."""
         p, k = self.p, self.p.ball_pocket
-        scroll = max(0, min(idx, n + 1 - 6))
-        raw = bytearray(self.b.read(p.bag_state, 20))
-        struct.pack_into('<H', raw, 6, k)
-        struct.pack_into('<H', raw, 8 + 2 * k, scroll)
-        struct.pack_into('<H', raw, 14 + 2 * k, idx - scroll)
+        raw = bytearray(self.b.read(p.bag_state, 0x1C))
+        raw[5] = k
+        struct.pack_into('<H', raw, 8 + 2 * k, 0)
+        struct.pack_into('<H', raw, 0x12 + 2 * k, 0)
         self.b.write(p.bag_state, bytes(raw))
 
     def bag_cursor(self):
-        """(ngăn, món đang chọn) của Túi."""
-        raw = self.b.read(self.p.bag_state, 20)
-        k = struct.unpack_from('<H', raw, 6)[0]
-        if k > 2:
+        """(ngăn, món đang chọn) của Túi (gBagPosition Emerald: ngăn u8 +5, con trỏ[5] +8, cuộn[5] +0x12)."""
+        raw = self.b.read(self.p.bag_state, 0x1C)
+        k = raw[5]
+        if k > 4:
             return k, None
-        return k, struct.unpack_from('<H', raw, 8 + 2 * k)[0] + struct.unpack_from('<H', raw, 14 + 2 * k)[0]
+        return k, struct.unpack_from('<H', raw, 8 + 2 * k)[0] + struct.unpack_from('<H', raw, 0x12 + 2 * k)[0]
 
     def player_look(self):
         """(gfx id, hướng 1 xuống/2 lên/3 trái/4 phải) của người chơi."""

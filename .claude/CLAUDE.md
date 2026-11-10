@@ -26,7 +26,7 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 ## Lệnh (chạy trong `tool\`, kèm `PYTHONIOENCODING=utf-8` khi in ra file)
 | Việc | Lệnh |
 |---|---|
-| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (đang bỏ qua) |
+| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (câu cá Emerald) |
 | Đọc game đang chạy | `py -3 dev\peek_em.py` / `dev\watch_em.py` |
 | Đồng bộ | `py -3 save_sync.py start` · `pull` · `push` · `status` · `code` |
 | Máy mới | `py -3 save_sync.py setup https://github.com/regidgeneral/pokemon-rapers.git` hoặc `CaiDat_LanDau.bat` |
@@ -49,7 +49,8 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 ## Trạng thái — việc treo
 **✅ Bài thử (10/11, bản Anh):** t_frmon 519/519 (tên, Route 101, màu, tiến hoá), t_box_fake 10/10, t_race_fake 4/4, t_gui_fake 0 lỗi; 411 ảnh Pokémon đúng.
 **☐ Chưa kiểm trong game thật:** mọi thứ (đọc đội/kho/túi/tiền/map, nhận trận, Bay). Chưa có `.sav`, chưa chạy Choi.bat lần nào.
-**☐ Tắt chờ đo trong game:** Săn tự bắt + câu cá (cần BattleMainCB2, controller chọn lệnh/chiêu, callback túi, task câu cá Emerald — câu cá Emerald có pha bấm A kịp lúc, khác FR). Nút Săn báo chưa dùng được.
+**☐ Săn + câu cá (11/11): đã đo trong game, đã code, CHƯA chạy thử bằng tool.** Task_Fishing 0x0808C8C1, bấm A ở bước 6-7 ("Oh! A bite!", ~0,5 giây) và ≥ 9. Trận: cb2 0x08038421, chọn lệnh 0x080597B5, chọn chiêu 0x08058B41 (chưa chắc), túi 0x081AAD5D / gBagPosition 0x0203CE58. Tự lưu sau khi bắt: TẮT (chưa dò con trỏ menu Start), chỉ nhắc lưu tay.
+Đo lại: `py -3 dev\watch_fish_em.py [giây]` (chỉ đọc), Duy tự câu/đánh tay.
 **✅ Hình nhân vật trên bản đồ (10/11):** ow_gfx 0x08505620 / ow_pals 0x0850BBC8, 245/245 hình vẽ được (Duy báo bản đồ chỉ có số tròn).
 **☐ Chưa dò:** roamer Latios/Latias.
 **☐ Máy nhà:** chưa nối. **☐ Chưa có `so_do/`.**

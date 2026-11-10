@@ -34,3 +34,13 @@
 - Dò: bảng con trỏ GraphicsInfo 0x08505620 (mục 0 Brendan 16x32, tag màu 0x1100, 1 tham chiếu), bảng màu {ptr, tag} 0x0850BBC8
   (tag 0x1103, 0x1104... 0x1100, 0x1101). Gfx 94/140/141 cỡ 48x48 / 96x40 / 88x32 (xe tải, tàu, bóng) → nới điều kiện cỡ trong
   ow_sprite thành bội 8, ≤ 128. 245/245 hình vẽ được, xem mẫu đúng. t_frmon thêm 1 kiểm (520/520).
+
+## 2026-11-11 — đo câu cá + trận đấu trong game thật
+- Duy đứng ở chỗ câu, câu tay 2 lần (dính cả 2), trong trận mở túi, ném bóng, chạy. Script `dev\watch_fish_em.py` (chỉ đọc gTasks,
+  gMain.callback2, gBattlerControllerFuncs, khoá, phím) — chết ở giây 101 vì PermissionError tranh file ipc với tool (đã sửa: bắt OSError).
+- Task_Fishing 0x0808C8C1 (lock = 1), bước 2 -> 4 -> 7 -> 10, A ở bước 10 -> vào trận. ROM: hàm gọi bảng 16 bước 0x0849755C (như pokeemerald).
+- Trận: callback2 0x08038421; controller[0] = 0x080597B5 ở menu chọn lệnh (A -> chiêu), 0x08058B41 lúc chọn chiêu (chỉ thấy 1 lần, chưa chắc);
+  túi trong trận callback2 0x081AAD5D (trùng ứng viên mẫu byte 10/11). gBagPosition 0x0203CE58 đọc thật: cb 0x08059D51, location 1, ngăn 1.
+- Code: hồ sơ thêm cb2_battle/ctl_*/cb2_bag/bag_state/fishing; set_bag_cursor/bag_cursor theo bố cục Emerald (mở ngăn Poké Ball ở đầu,
+  bấm xuống tới đúng bóng); câu bấm A ở bước 6-7 (6 khung chờ) và ≥ 9; tắt tự lưu (START_MENU_CURSOR = None) -> nhắc lưu tay.
+- Bài thử: t_fish_fake 19/19 (thêm bước 3, 6, 7, 8), t_frmon 520, box 10, race 4, gui 0 lỗi. CHƯA chạy Săn thật.

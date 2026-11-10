@@ -1,4 +1,4 @@
-"""Thử săn câu cá trên bộ nhớ giả FireRed: giả lập task câu cá, ghi lại phím tool bấm.  py -3 dev\\t_fish_fake.py"""
+"""Thử săn câu cá trên bộ nhớ giả Emerald: giả lập task câu cá, ghi lại phím tool bấm.  py -3 dev\\t_fish_fake.py"""
 import os, struct, sys
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
@@ -29,7 +29,7 @@ def check(name, cond):
 spot = None
 for gn in app.story.maps():
     w = app.rom.wild_for_map(*gn) or {}
-    if 'fish' in w and gn[0] == 3:
+    if 'fish' in w and gn[0] == 0:
         t = app.story.landing_tile(*gn, 'fish')
         if t:
             enc = app.story.encounter_tiles(*gn)
@@ -74,17 +74,21 @@ check('bắt đầu ở chế độ câu', app.hunt and app.hunt['kind'] == 'fis
 check('đã đăng ký Old Rod vào SELECT', g.registered_item() == 262)
 app.hunt_step()
 check('quăng cần bằng SELECT', pressed and pressed[-1][1] == ['SELECT'])
-for s in (0, 2, 4, 4, 5):
+for s in (0, 2, 3, 4, 4, 5, 8):
     set_task(s)
     n = len(pressed)
     app.hunt_step()
-    check('bước %d: không bấm gì' % s, len(pressed) == n)
+    check('bước %d (dấu chấm / chờ): không bấm gì' % s, len(pressed) == n)
+for s in (6, 7):
+    set_task(s)
+    app.hunt_step()
+    check('bước %d ("Oh! A bite!"): bấm A ngay' % s, pressed[-1] == (s, ['A']))
 set_task(9)
 app.hunt_step()
-check('bước 9 (cá cắn): bấm A', pressed[-1] == (9, ['A']))
+check('bước 9 (on the hook): bấm A', pressed[-1] == (9, ['A']))
 set_task(10)
 app.hunt_step()
-check('bước 10 ("on the hook!" chờ A, đo trong game 09/11): bấm A', pressed[-1] == (10, ['A']))
+check('bước 10 ("on the hook!" chờ A, đo trong game 11/11): bấm A', pressed[-1] == (10, ['A']))
 set_task(None)
 app.hunt_step()
 check('xong lượt: quăng lại', pressed[-1][1] == ['SELECT'])

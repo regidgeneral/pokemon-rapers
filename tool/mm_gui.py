@@ -2595,9 +2595,6 @@ class App(tk.Tk):
             self.hunt_stop('Đã dừng săn.')
             return
         g = self.game
-        if not getattr(self.prof, 'ctl_action', None):        # Emerald 10/11: chưa dò hàm trận đấu / câu cá
-            return self.hunt_refused('Săn chưa dùng được với Emerald: tool chưa biết địa chỉ màn chọn lệnh trong '
-                                     'trận và câu cá của bản này. Cần đo trong game trước.')
         try:
             g.keys_left()
         except BridgeError as e:
@@ -2832,7 +2829,7 @@ class App(tk.Tk):
             return 'Map này không có Pokémon câu được.'
         have = self.game.rods()
         if not have:
-            return 'Bạn chưa có cần câu (Old Rod ở Vermilion, Good Rod ở Fuchsia, Super Rod ở Route 12).'
+            return 'Bạn chưa có cần câu (Old Rod ở Dewford, Good Rod ở Route 118, Super Rod ở Mossdeep).'
         if self.hunt_target:
             labels = {x[2] for x in self.species_locations(self.hunt_target) if x[0] == gn and x[1] == 'fish'}
             ok = [r for r in have if self.ROD_LABEL[r] in labels]
@@ -2844,8 +2841,9 @@ class App(tk.Tk):
         return have[-1]
 
     def hunt_fish_step(self):
-        """Một nhịp câu: không đang câu -> SELECT quăng cần; đang câu -> chỉ bấm A khi đã có thông báo (bước >= 9, gồm 10),
-        không bấm lúc đang hiện dấu chấm (FR: bấm A lúc đó là cá bỏ đi)."""
+        """Một nhịp câu: không đang câu -> SELECT quăng cần; đang câu -> bấm A ngay khi cá cắn (bước trong
+        fishing['press_a'], Emerald 6-7: trễ ~0,5 giây là cá chạy) và khi có thông báo (bước >= 9);
+        không bấm lúc đang hiện dấu chấm (bấm A lúc đó là hỏng lượt)."""
         h, g = self.hunt, self.game
         st, now = g.fishing_step(), time.time()
         if st != h['fish_st'] or now - h.get('fish_seen', 0) > 2:   # đổi bước, hoặc vừa đánh trận xong
@@ -2855,7 +2853,9 @@ class App(tk.Tk):
                                                     if st is None else 'game đứng yên ở bước câu %d quá 20 giây' % st), False)
         h['fish_seen'] = now
         if st is not None:
-            if st >= 9:                                       # đo 09/11: "on the hook!" đứng ở bước 10 chờ A rồi mới vào trận
+            if st in self.prof.fishing['press_a']:            # "Oh! A bite!": bấm ngay, không chờ 20 khung
+                g.press([('A', 3), (None, 6)])
+            elif st >= 9:                                     # đo 11/11: "on the hook!" đứng ở bước 10 chờ A rồi mới vào trận
                 g.press([('A', 3), (None, 20)])
             return
         if g.b.read(self.prof.fly['lock'], 1)[0]:             # chữ khác (vd cần chưa đăng ký) / sự kiện
@@ -3455,7 +3455,7 @@ class App(tk.Tk):
                  (v, 3), (None, 4), (hz, 3), (None, 4), ('A', 3), (None, 60)])
 
     SAV_FILE = os.path.join(ROOT, 'Pokemon - Emerald Version (USA, Europe).sav')
-    START_MENU_CURSOR = 0x020370F4   # con trỏ menu đang mở (đo 07/11: mở Start = vị trí lần trước, 7 mục, vòng)
+    START_MENU_CURSOR = None         # Emerald: chưa dò (FR 0x020370F4) -> không tự lưu sau khi bắt
     START_MENU_SAVE = 4              # POKéDEX, POKéMON, Túi, <tên>, Lưu, CaiDat, Exit
 
     def _sav_mtime(self):
@@ -3512,8 +3512,11 @@ class App(tk.Tk):
         if got:
             self.hunt['caught'] = self.hunt.get('caught', 0) + 1
             self.say('✔ Đã bắt %s (%s) sau %d bóng. Săn tiếp…' % (c['name'], c['why'], c['thrown']))
-            if c.get('save'):                                 # Duy 07/11: bắt con quan trọng xong lưu game ngay
+            if c.get('save') and self.START_MENU_CURSOR:      # Duy 07/11: bắt con quan trọng xong lưu game ngay
                 self.hunt['save'] = dict(stage=0, t=time.time(), mtime=self._sav_mtime(), name=c['name'])
+            elif c.get('save'):                               # Emerald: chưa dò con trỏ menu Start -> nhắc lưu tay
+                self.alert('💾 Nhớ lưu game', 'Vừa bắt %s (%s), tool chưa tự lưu được ở Emerald' % (c['name'], c['why']),
+                           None, False, sticky=True)
         else:
             self.say('✘ Chưa bắt được %s (%s), trận đã hết. Săn tiếp…' % (c['name'], c['why']), False)
         self.hunt_sound(False)                                # săn tiếp: tắt tiếng lại
