@@ -140,3 +140,14 @@
   (đội, đối thủ, trận trainer = battle_type & 8); trận mới chen giữa thì bỏ phần trận cũ (không ghi đội giữa trận); về bản đồ mới
   finish_exp. Công tắc ⚙ "Chia EXP cho cả đội + kho PC..." (settings box_exp, mặc định bật).
 - Bài thử t_exp_fake 22/22 (công thức tính tay, tiến hoá, luồng trận giả); mọi bài thử qua.
+
+## 2026-11-11 — đường tím không hiện ở Route 112: tìm đường theo vùng
+- Duy gửi ảnh Route 112 (19,37), bước Meteor Falls: không có đường tím. route_path chọn ít map nhất Route 112 -> mép Bắc -> Route 113,
+  nhưng mép đó ở phần trên vách, không đi bộ tới -> walk_path None -> không vẽ. Đo: từ (19,37) tới được mép Đông (Route 111) và cửa
+  Fiery Path (11,36); không tới mép Bắc, Tây, cửa Jagged Pass, cửa Fiery Path phía trên (22,10).
+- Lần sửa 1 (chỉ lọc lối ra tới được + route_path) chọn Route 111 -> Route 113: sai vì phải băng sa mạc. Route 111 có 10 ô kích hoạt
+  bão cát need_item GO-GOGGLES (11..14,61; 12,44; 13,43; 14,42; 16,40; 17,39; 18,38).
+- Sửa: map_info connections thêm offset; Story.item_gates, Story.reach(starts, blocked); App.route_from_here = BFS (map, ô vào) với vùng
+  loang, ô kích hoạt đòi vật phẩm chưa có = tường (gate_block, q_have), walk_path cũng tránh. Kết quả không Go-Goggles: Route 112 ->
+  Fiery Path -> Route 112 (bắc) -> Route 111 (trên sa mạc) -> Route 113 -> Fallarbor -> Route 114 -> Meteor Falls (0,34 giây);
+  có Go-Goggles: qua sa mạc. t_quest_fake 35/35 (thêm ca đúng ảnh), mọi bài thử qua.

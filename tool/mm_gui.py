@@ -3092,11 +3092,101 @@ class App(tk.Tk):
         g = self.guide_goal()
         if not g or not frm:
             return None
-        path = self.route_path(frm, g[0])
+        xy = None
+        if frm == self.q_cur:                                  # map đang đứng: chỉ xét lối ra đi bộ tới được từ chỗ đứng
+            try:
+                xy = self.q_player or self.game.player_xy()
+            except BridgeError:
+                xy = None
+        go = lambda dst: (self.route_from_here(frm, xy, dst) if xy else None) or self.route_path(frm, dst)
+        path = go(g[0])
         s = getattr(self, 'q_step', None)
         if not path and not self.hunt_goal and s and s.get('via') and g[0] == s['map'] and frm != s['via'][0]:
-            path = self.route_path(frm, s['via'][0])
+            path = go(s['via'][0])
         return path
+
+    def route_from_here(self, frm, xy, goal):
+        """[map...] như route_path nhưng chặng đầu chỉ dùng cửa / mép map nằm trong vùng đi bộ tới được từ ô xy (Duy 11/11:
+        Route 112 phía dưới -> Fiery Path, không phải mép trên sang Route 113). None nếu không lối nào tới được đích."""
+        from collections import deque
+        st = self.story
+        if frm == goal:
+            return [frm]
+        have_key = frozenset(getattr(self, 'q_have', None) or ())
+        rc = self.__dict__.setdefault('_reach_cache', {})
+        if len(rc) > 400:
+            rc.clear()
+
+        def region(m, entries):
+            k = (m, entries, have_key)
+            if k not in rc:
+                rc[k] = st.reach(*m, list(entries), self.gate_block(m))
+            return rc[k]
+
+        start = (frm, frozenset([tuple(xy)]))
+        R0 = region(*start)
+        key = (frm, min(R0) if R0 else tuple(xy), goal, have_key)  # cùng vùng đứng = cùng đường
+        cache = self.__dict__.setdefault('_route_here', {})
+        if key in cache:
+            return cache[key]
+        if len(cache) > 200:
+            cache.clear()
+        prev, q, seen_reg, found, n = {start: None}, deque([start]), set(), None, 0
+        while q and n < 80:
+            node = q.popleft()
+            m, ent = node
+            try:
+                R, info = region(m, ent), st.map_info(*m)
+            except Exception:
+                continue
+            reg = (m, min(R) if R else min(ent))
+            if reg in seen_reg:
+                continue
+            seen_reg.add(reg)
+            n += 1
+            if m == goal and node != start:
+                found = node
+                break
+            w, h = info['w'], info['h']
+            nxt = []
+            for c in info['connections']:              # bước qua mép: ô ở mép vùng này -> ô tương ứng của map bên kia
+                d, B, off = c['dir'], c['to'], c.get('offset', 0)
+                try:
+                    wb, hb = st.map_info(*B)['w'], st.map_info(*B)['h']
+                except Exception:
+                    continue
+                e2 = {'Bắc': {(x - off, hb - 1) for x, y in R if y == 0}, 'Nam': {(x - off, 0) for x, y in R if y == h - 1},
+                      'Tây': {(wb - 1, y - off) for x, y in R if x == 0},
+                      'Đông': {(0, y - off) for x, y in R if x == w - 1}}.get(d, set())
+                e2 = frozenset(p for p in e2 if 0 <= p[0] < wb and 0 <= p[1] < hb)
+                if e2:
+                    nxt.append((B, e2))
+            for wp in info['warps']:                   # cửa / cầu thang / hang trong vùng -> ô cửa tương ứng bên kia
+                if any((wp['x'] + dx, wp['y'] + dy) in R for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1))):
+                    try:
+                        ws = st.map_info(*wp['to'])['warps']
+                    except Exception:
+                        continue
+                    if wp['warp'] < len(ws):
+                        nxt.append((wp['to'], frozenset([(ws[wp['warp']]['x'], ws[wp['warp']]['y'])])))
+            for nb in nxt:
+                if nb not in prev:
+                    prev[nb] = node
+                    q.append(nb)
+        path = None
+        if found:
+            path, x = [], found
+            while x is not None:
+                path.append(x[0])
+                x = prev[x]
+            path.reverse()
+        cache[key] = path
+        return path
+
+    def gate_block(self, m):
+        """Ô kích hoạt chặn đường vì thiếu vật phẩm (bão cát Route 111 cần Go-Goggles...) theo túi đồ lần đọc gần nhất."""
+        have = getattr(self, 'q_have', None) or set()
+        return frozenset((x, y) for x, y, it in self.story.item_gates(*m) if it not in have)
 
     def guide_tiles(self, m):
         """Ô đích trên map m: cạnh NPC / điểm nhiệm vụ nếu m là map đích; không thì cửa hoặc mép map dẫn sang chặng kế."""
@@ -3139,7 +3229,7 @@ class App(tk.Tk):
         if getattr(self, '_q_route_key', None) == key:
             return self._q_route_val
         st = self.story
-        busy = {(x, y) for _, x, y in objs} - tiles
+        busy = ({(x, y) for _, x, y in objs} | self.gate_block(self.q_shown)) - tiles
         path = st.walk_path(*self.q_shown, xy, tiles, blocked=busy)
         blockers = []
         if not path:
@@ -4160,7 +4250,7 @@ class App(tk.Tk):
         g, n = self.q_shown
         info = st.map_info(g, n)
         self.quest_sum_label()
-        have = self.quest_have()
+        have = self.q_have = self.quest_have()                # q_have: ô kích hoạt đòi vật phẩm (gate_block) khi tìm đường
         guide = st.guide(g, n, flag, have)
         self.quest_progress(flag)
         self.quest_next_text(T)

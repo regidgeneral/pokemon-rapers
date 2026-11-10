@@ -164,6 +164,19 @@ txt = app.q_text.get('1.0', 'end')
 check('đủ hết: ✔ HM06, ✔ huy hiệu 3, ✔ %s biết' % r.species_name(279), '✔ HM06 Rock Smash trong túi' in txt
       and '✔ Huy hiệu 3' in txt and '✔ %s biết ROCK SMASH' % r.species_name(279) in txt)
 check('đủ hết: đường tím dẫn thẳng tới Meteor Falls', app.guide_goal()[:2] == (S[mf]['map'], S[mf]['xy']))
+# đúng ảnh Duy 11/11: Route 112 phía dưới (19,37), mép sang Route 113 ở phía trên vách -> phải qua Fiery Path (cửa 11,36)
+b.write(sb1 + p.loc_off, bytes([0, 27]))
+b.write(p.player_obj + 0x10, struct.pack('<hh', 19 + 7, 37 + 7))
+app.quest_home()
+app.update()
+rp = app.guide_route((0, 27))
+check('Route 112 (19,37) -> Meteor Falls: chặng đầu là FIERY PATH (%s)' % (rp[:2] if rp else None),
+      rp and rp[0] == (0, 27) and app.rom.map_name(*rp[1]) == 'FIERY PATH')
+qp = app.q_cv.find_withtag('qpath')
+co = app.q_cv.coords(qp[-1]) if qp else []
+k = app.q_scale * 16
+check('đường tím từ (19,37) tới cửa Fiery Path (11,36)', co and co[:2] == [19 * k + k // 2, 37 * k + k // 2]
+      and tuple((c - k // 2) // k for c in co[-2:]) == (11, 36))
 app.quest_pick_go((S[mf]['map'], (1, 1), 'thử'))
 check('bấm 🧭 một dòng: đường tím đổi theo', app.guide_goal() == (S[mf]['map'], (1, 1), 'thử'))
 g.party = real_party

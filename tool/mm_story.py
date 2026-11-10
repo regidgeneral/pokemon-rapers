@@ -156,7 +156,8 @@ class Story:
         if is_rom(con) and 0 < self.u32(con) < 16 and is_rom(self.u32(con + 4)):
             for i in range(self.u32(con)):
                 a = self.u32(con + 4) + 12 * i
-                info['connections'].append(dict(dir=DIRS.get(self.u8(a), '?'), to=(self.u8(a + 8), self.u8(a + 9))))
+                info['connections'].append(dict(dir=DIRS.get(self.u8(a), '?'), to=(self.u8(a + 8), self.u8(a + 9)),
+                                                offset=struct.unpack_from('<i', self.d, self.o(a + 4))[0]))
         if is_rom(mscr):
             a = mscr
             while self.u8(a) and a < mscr + 80:
@@ -627,6 +628,37 @@ class Story:
                                 idx.setdefault(f[1], []).append(((g, n), kind, e.get('x'), e.get('y')))
             self._scripts['setters'] = idx
         return idx.get(flag, [])
+
+    def item_gates(self, g, n):
+        """[(x, y, vật phẩm)] ô kích hoạt chỉ cho đi qua khi có vật phẩm (vd bão cát Route 111 cần Go-Goggles)."""
+        key = ('gates', g, n)
+        if key not in self._scripts:
+            self._scripts[key] = [(t['x'], t['y'], f[1]) for t in self.map_info(g, n)['triggers']
+                                  for f in (t['facts'] or []) if f[0] == 'need_item']
+        return self._scripts[key]
+
+    def reach(self, g, n, starts, blocked=()):
+        """Tập ô đi bộ tới được từ các ô starts (cùng luật va chạm + độ cao như walk_path), không đi vào ô blocked.
+        Duy 11/11: Route 112 phía dưới không lên thẳng mép sang Route 113 được, phải qua Fiery Path."""
+        from collections import deque
+        lay = self.u32(self.header(g, n))
+        w, h, _, blocks = struct.unpack_from('<iiII', self.d, self.o(lay))
+        raw = struct.unpack_from('<%dH' % (w * h), self.d, self.o(blocks))
+        if isinstance(starts, tuple) and len(starts) == 2 and isinstance(starts[0], int):
+            starts = [starts]
+        seen = {p for p in starts if 0 <= p[0] < w and 0 <= p[1] < h}
+        q = deque(seen)
+        while q:
+            p = q.popleft()
+            ep = raw[p[1] * w + p[0]] >> 12
+            for nx, ny in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)):
+                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and (nx, ny) not in blocked:
+                    v = raw[ny * w + nx]
+                    e = v >> 12
+                    if not v >> 10 & 3 and (e == ep or e in (0, 15) or ep in (0, 15)):
+                        seen.add((nx, ny))
+                        q.append((nx, ny))
+        return seen
 
     def walk_path(self, g, n, start, goals, blocked=()):
         """[(x, y)...] đường ngắn nhất từ start tới một ô trong goals trên lưới va chạm của map (Duy 11/11: vẽ đường tới
