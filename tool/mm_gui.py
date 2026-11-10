@@ -429,7 +429,8 @@ class App(tk.Tk):
         save = self.save_area_state
         m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận + xoá trạng thái xấu trong trận', variable=self.auto_heal,
                           command=save)
-        m.add_checkbutton(label='Bắt xong không đặt biệt danh (tự chọn NO)', variable=self.skip_nick, command=save)
+        m.add_checkbutton(label='Bắt xong không đặt biệt danh (tự chọn NO)', variable=self.skip_nick,
+                          command=lambda: (save(), setattr(self, '_nick_sent', None)))   # gửi Lua ngay nhịp tới
         m.add_separator()
         m.add_checkbutton(label='Báo khi gặp shiny / nên bắt (kêu + khung nổi, không lấy phím của mGBA)',
                           variable=self.alert_on, command=save)
@@ -1416,6 +1417,7 @@ class App(tk.Tk):
 
     def tick_battle(self):
         """Trận vừa xong và đã về overworld (qua màn tiến hoá/học chiêu) -> tự hồi phục cả đội."""
+        self.sync_skip_nick()
         st = self.game.battle_state()
         if st is None:
             return
@@ -1436,7 +1438,7 @@ class App(tk.Tk):
                 cured = self.game.cure_battle_status()
                 if cured:
                     self.say('💊 Trong trận: ' + ' · '.join('%s hết %s' % c for c in cured))
-            if self.skip_nick.get() and self.game.nickname_prompt():   # Duy 11/11: bắt xong không đặt biệt danh
+            if self.skip_nick.get() and not self._nick_lua and self.game.nickname_prompt():   # Lua cũ: Python bấm B
                 try:
                     if self.game.keys_left() == 0:
                         self.game.press([('B', 3), (None, 20)])        # B = NO, game tự dọn khung YES/NO
@@ -1457,6 +1459,25 @@ class App(tk.Tk):
                 msg.append(self.status.cget('text'))
             if msg:
                 self.say('Sau trận — ' + ' · '.join(msg))
+
+    _nick_sent, _nick_lua = None, None
+
+    def sync_skip_nick(self):
+        """Gửi công tắc "không đặt biệt danh" cho mm_bridge.lua (lệnh N): khi đổi công tắc và 15 giây một lần (Lua nạp
+        lại thì mất). Lua bản cũ (ERR) -> _nick_lua = False, tick_battle bấm B thay (chậm hơn, có thể trượt khi bấm A dồn)."""
+        on = self.skip_nick.get()
+        if self._nick_sent and self._nick_sent[0] == on and time.time() - self._nick_sent[1] < 15:
+            return
+        if not hasattr(self.bridge, '_send'):                    # bộ nhớ giả
+            return
+        try:
+            self.game.set_skip_nick(on)
+            self._nick_lua = True
+        except BridgeError as e:
+            if 'ERR' not in str(e):
+                return                                           # bridge bận: nhịp sau gửi lại
+            self._nick_lua = False
+        self._nick_sent = (on, time.time())
 
     def fix_form_dex(self):
         """Bảng số Pokédex của hack ghi 0 cho chim Galar, Gigantamax... nên game không bật cờ khi bắt chúng.

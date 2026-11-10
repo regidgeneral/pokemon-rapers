@@ -86,3 +86,11 @@
   0x02024332 + gMain + BattleMainCB2 0x08038421 = trygivecaughtmonnick. Vùng battle script chỉ có 1 chỗ 0xF3: 0x082DBDAF.
   gBattlescriptCurrInstr 0x02024214 (526 tham chiếu). Bước chờ YES/NO = gBattleCommunication[0] == 1 theo pokeemerald, CHƯA đo thật.
 - Code: hồ sơ `nickname`, Game.nickname_prompt, tick_battle bấm B (game tự dọn khung). Bài thử t_status_fake 14/14, bài cũ qua hết.
+
+## 2026-11-11 — đặt biệt danh vẫn hiện -> chuyển sang Lua
+- Duy gửi ảnh màn "SHROOMISH's nickname?" có chữ "A" đã gõ. Đọc lúc đó: đã về overworld (lỡ khoảnh khắc). Tool chạy bản mới (14:05),
+  skip_nick bật. Kết luận: bấm A dồn qua "Gotcha!" -> A rơi vào câu hỏi (con trỏ mặc định YES) trước khi Python (kiểm ~1 giây/lần) bấm B.
+- pokeemerald battle_script_commands.c:10220-10292: bước 0 vẽ YES/NO -> 1; bước 1 A+YES -> 2 (màn đặt tên), B hoặc A+NO -> 4
+  (không dọn gì thêm); 4 = nhảy qua. -> Lua lệnh N: mỗi khung hình, lệnh 0xF3 và bước <= 1 -> ghi 4 (khung YES/NO không kịp hiện).
+- Python: Game.set_skip_nick, App.sync_skip_nick (15 giây/lần + khi đổi công tắc), Lua cũ -> giữ cách bấm B.
+  Lua đang chạy trả "ERR cmd N" (chưa nạp lại). Không có trình Lua trên máy -> chưa soát được cú pháp ngoài mGBA.

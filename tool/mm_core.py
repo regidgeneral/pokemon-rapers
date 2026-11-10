@@ -1386,6 +1386,12 @@ class Game:
         return (ROM_BASE <= ptr < ROM_BASE + len(self.rom.d) and self.rom.d[ptr - ROM_BASE] == nk['opcode']
                 and st[0] == nk['wait_state'])
 
+    def set_skip_nick(self, on):
+        """Bật/tắt lệnh N của mm_bridge.lua: Lua tự bỏ qua câu hỏi đặt biệt danh ngay trong khung hình nó xuất hiện
+        (Duy 11/11: bấm A dồn qua chữ "Gotcha!" thì Python kiểm mỗi giây không kịp). Lua bản cũ -> BridgeError 'ERR cmd'."""
+        nk = self.p.nickname
+        self.b._send(['N %08x %08x %x' % (nk['curr_instr'], nk['comm'], nk['opcode']) if on else 'N 0 0 0'])
+
     STATUS_NAMES = ((0x7, 'ngủ'), (0x8, 'độc'), (0x10, 'bỏng'), (0x20, 'đóng băng'), (0x40, 'tê liệt'), (0x80, 'độc nặng'))
 
     def cure_battle_status(self):

@@ -4,6 +4,8 @@
 --             "K <mask_hex> <số khung>" = xếp hàng giữ phím (mask 0 = chờ), "S 0 0" = hỏi còn bao nhiêu khung phím
 --             "A <gTasks_hex> <hàm_task_hex> <bước,bước>" = tự bấm A ngay trong khung hình task đó tới bước đã nêu
 --             (câu cá: "Oh! A bite!" chỉ chờ ~30 khung, fast forward thì Python không kịp); "A 0 0 0" = tắt. Trả "1".
+--             "N <con trỏ lệnh_hex> <biến bước_hex> <mã lệnh_hex>" = mỗi khung hình: lệnh battle script đang chạy là mã đó
+--             (0xF3 trygivecaughtmonnick) và bước <= 1 thì ghi bước = 4 (như bấm B: không đặt biệt danh); "N 0 0 0" = tắt.
 --   resp.txt: dòng 1 = id; dòng 2 = OK hoặc ERR <lý do>; rồi mỗi lệnh R / S một dòng
 -- Phím GBA: A=1 B=2 Select=4 Start=8 Phải=0x10 Trái=0x20 Lên=0x40 Xuống=0x80 R=0x100 L=0x200 (cộng với phím thật).
 -- Cho đọc/ghi EWRAM (0x02000000-0x0203FFFF) và IWRAM (0x03000000-0x03007FFF); ROM (0x08000000-0x09FFFFFF) chỉ đọc.
@@ -23,6 +25,7 @@ local lastId = nil
 local frameCount = 0
 local keyQueue, keyCur = {}, nil     -- hàng phím: {mask, số khung}
 local autoA = nil                    -- {tasks, fn, {bước = true}, đã bấm cho lượt này?, số khung còn giữ A}
+local skipNick = nil                 -- {instr = địa chỉ gBattlescriptCurrInstr, comm = gBattleCommunication, op = mã lệnh}
 
 local function inRange(addr, len, isWrite)
 	if len < 0 or len > 4096 then return false end
@@ -98,6 +101,16 @@ local function handle(text)
 				autoA = { tasks = addr, fn = tonumber(fn, 16), steps = set, done = false, hold = 0 }
 			end
 			out[#out + 1] = "1"
+		elseif op == "N" then
+			local comm, code = lines[i]:match("^N%s+%x+%s+(%x+)%s+(%x+)")
+			if not addr or addr == 0 then
+				skipNick = nil
+			else
+				local c = comm and tonumber(comm, 16)
+				if not (inRange(addr, 4, true) and c and inRange(c, 1, true) and code) then out[2] = "ERR nick " .. lines[i]; break end
+				skipNick = { instr = addr, comm = c, op = tonumber(code, 16) }
+			end
+			out[#out + 1] = "1"
 		elseif op == "S" then
 			local left = keyCur and keyCur[2] or 0
 			for _, k in ipairs(keyQueue) do left = left + k[2] end
@@ -146,9 +159,18 @@ local function autoTick()           -- mỗi khung hình: task câu cá tới b�
 	end
 end
 
+local function nickTick()           -- mỗi khung hình: câu hỏi đặt biệt danh sau khi bắt -> bỏ qua (bước = 4)
+	if not skipNick then return end
+	local p = emu:read32(skipNick.instr)
+	if p >= 0x08000000 and p < 0x0A000000 and emu:read8(p) == skipNick.op and emu:read8(skipNick.comm) <= 1 then
+		emu:write8(skipNick.comm, 4)
+	end
+end
+
 local function poll()
 	keyTick()
 	autoTick()
+	nickTick()
 	frameCount = frameCount + 1
 	if frameCount % POLL_EVERY ~= 0 then return end
 	local f = io.open(IPC .. "cmd.txt", "rb")
