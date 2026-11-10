@@ -432,6 +432,8 @@ class App(tk.Tk):
         save = self.save_area_state
         m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận + xoá trạng thái xấu trong trận', variable=self.auto_heal,
                           command=save)
+        m.add_checkbutton(label='Chia EXP cho cả đội + kho PC (như Exp. Share), lên level tự tiến hoá',
+                          variable=self.box_exp, command=save)
         m.add_checkbutton(label='Dẫn đường nhiệm vụ (đường tím tới bước cốt truyện tiếp theo)', variable=self.q_guide,
                           command=lambda: (save(), self.guard(self.quest_render)()))
         m.add_checkbutton(label='Bắt xong không đặt biệt danh (tự chọn NO)', variable=self.skip_nick,
@@ -1433,12 +1435,12 @@ class App(tk.Tk):
             if self.exp_snap:                                    # gặp trận mới ngay, tool không kịp thấy lúc hết trận cũ:
                 pids = {m.pid for m in self.game.enemy_party() if not m.empty}   # đối thủ đổi = trận cũ đã xong
                 if pids != {m.pid for m in self.exp_snap[1]}:
-                    self.finish_exp()
+                    self.exp_snap = None                         # không ghi đội giữa trận: bỏ phần chia của trận cũ
                     new = True
-            if new and getattr(self.prof, 'box_ptr', None) and self.box_exp.get() \
-                    and self.game.exp_share_on():                # đầu trận: chụp EXP đội + đối thủ
+            if new and self.box_exp.get():                       # Duy 11/11: đầu trận chụp EXP đội + đối thủ + trận trainer?
                 foes = [m for m in self.game.enemy_party() if not m.empty and m.checksum_ok]
-                self.exp_snap = ([m for m in self.game.party() if not m.empty], foes) if foes else None
+                trainer = bool(self.game.b.read(self.prof.battle_type, 1)[0] & 8)   # BATTLE_TYPE_TRAINER
+                self.exp_snap = ([m for m in self.game.party() if not m.empty], foes, trainer) if foes else None
             self.was_battle = True
             if self.auto_heal.get():                             # Duy 11/11: mọi trận, xoá trạng thái xấu ngay trong trận
                 cured = self.game.cure_battle_status()
@@ -1451,7 +1453,7 @@ class App(tk.Tk):
                 except (BridgeError, AttributeError):            # Lua cũ / bộ nhớ giả (không có _send): bạn tự chọn
                     pass
             return
-        if self.exp_snap:                                        # cờ trong trận tắt = EXP đã chia xong, không chờ overworld
+        if self.exp_snap and overworld:                          # về bản đồ (qua màn tiến hoá của game) mới ghi đội + kho
             self.finish_exp()
         if overworld and not getattr(self, '_form_dex_done', False):
             self._form_dex_done = True                          # lần đầu tool thấy game: ghi Pokédex dạng Galar...
@@ -1513,50 +1515,66 @@ class App(tk.Tk):
                 '%s #%d' % (r.species_name(sp), r.natdex(sp)) for sp in need))
 
     def finish_exp(self):
-        """Trận trong exp_snap đã xong: cộng EXP cho kho PC theo đối thủ bị hạ/bắt, ghi nhật ký."""
-        before, foes = self.exp_snap
+        """Duy 11/11: trận trong exp_snap đã xong và đã về bản đồ -> chia EXP như Exp. Share Gen 3 cho mọi con KHÔNG ra trận
+        (trong đội + kho PC) theo các đối thủ bị hạ (bắt được thì không có EXP, như game), lên level thì tự tiến hoá.
+        Đội ghi có điều kiện từng con (write_mon); kho ghi các box có đổi. Ghi 1 dòng vào battle_log.jsonl."""
+        before, foes, trainer = self.exp_snap
         self.exp_snap = None
-        after = [m for m in self.game.party() if not m.empty]
-        end = {m.pid: m for m in self.game.enemy_party() if not m.empty}
-        beaten, old, box, evolved = [], b'', b'', []
-        now_exp = {m.pid: m.exp for m in after}
-        if any(now_exp.get(m.pid, m.exp) > m.exp for m in before):          # con có từ đầu trận nhận EXP (không tính con vừa bắt)
-            base, box = self.game.read_box()
-            old = bytes(box)
-            # bị bắt (CFRU cho EXP khi bắt) = PID vừa có trong đội hoặc kho
-            caught = {m.pid for m in after} | {struct.unpack_from('<I', old, o)[0] for o in range(0, len(old), self.prof.box_size)}
-            # bị hạ (HP 0), bị bắt, hoặc đã sang trận mới nên đối thủ cũ không còn trong bộ nhớ (trận đôi: tính từng con)
-            beaten = [m for m in foes if m.pid not in end or end[m.pid].hp == 0 or m.pid in caught]
-            n = box_exp_share(self.rom, [(m.species, m.level) for m in beaten], box, self.game.player_otid())
-            evolved = box_evolve(self.rom, box)                              # đủ cấp là đổi loài, không qua màn tiến hoá của game
-            if n or evolved:
-                self.game.write_box(base, old, box)
-            if evolved:
-                self.game.mark_dex({to for _, _, to in evolved})
-                names = ['%s → %s' % (self.rom.species_name(a), self.rom.species_name(b)) for _, a, b in evolved]
-                self.exp_msg.append('kho PC đổi loài: ' + ', '.join(names[:4]) + (' và %d con khác' % (len(names) - 4) if len(names) > 4 else ''))
-            if n:
-                self.exp_msg.append('kho PC: +EXP cho %d con' % n)
-        self.log_battle(foes, end, beaten, before, after, old, box, evolved)
-
-    def log_battle(self, foes, end, beaten, before, after, old, box, evolved=()):
-        """Ghi 1 dòng JSON mỗi trận vào battle_log.jsonl để đối chiếu EXP sau này.
-        party: [tên, lv trước, lv sau, EXP nhận, đủ x1.2 tiến hoá lúc vào trận]; box: [ô, tên, lv, EXP được cộng, x1.2]."""
-        r, p = self.rom, self.prof
-        now = {m.pid: m for m in after}
-        rec = {'time': time.strftime('%Y-%m-%d %H:%M:%S'),
-               'foes': [[r.species_name(m.species), m.level, end[m.pid].hp if m.pid in end else None] for m in foes],
-               'beaten': [[r.species_name(m.species), m.level] for m in beaten],
-               'party': [[r.species_name(m.species), m.level, now[m.pid].level if m.pid in now else None,
-                          now[m.pid].exp - m.exp if m.pid in now else None, could_have_evolved(r, m.species, m.level)]
-                         for m in before],
-               'box': [], 'evolved': [[c, r.species_name(a), r.species_name(b)] for c, a, b in evolved]}
-        for o in range(0, len(old), p.box_size):
-            e0, e1 = (struct.unpack_from('<I', d, o + p.box_exp)[0] for d in (old, box))
-            if e1 != e0:
-                sp = struct.unpack_from('<H', old, o + p.box_species)[0]
-                lv = r.level_for(r.growth(sp), e0)
-                rec['box'].append([o // p.box_size, r.species_name(sp), lv, e1 - e0, could_have_evolved(r, sp, lv)])
+        g, r = self.game, self.rom
+        party = g.party()
+        after = [m for m in party if not m.empty]
+        end = {m.pid: m for m in g.enemy_party() if not m.empty}
+        addrs, box = g.read_box()
+        old = bytes(box)
+        caught = {m.pid for m in after} | {struct.unpack_from('<I', old, o)[0] for o in range(0, len(old), BOX_MON_SIZE)}
+        beaten = [m for m in foes if (m.pid not in end or end[m.pid].hp == 0) and m.pid not in caught]
+        rec = {'time': time.strftime('%Y-%m-%d %H:%M:%S'), 'trainer': trainer,
+               'beaten': [[r.species_name(m.species), m.level] for m in beaten], 'party': [], 'box': [], 'evolved': []}
+        evo_sp = set()
+        if beaten:
+            fl = [(m.species, m.level) for m in beaten]
+            lucky, ever, otid = r.item_id('LUCKY EGG'), r.item_id('EVERSTONE'), g.player_otid()
+            start = {m.pid: m.exp for m in before}
+            for slot, m in enumerate(party):
+                # chỉ con có từ đầu trận, chưa nhận EXP trong trận (= không ra trận), còn sức, không phải trứng
+                if m.empty or m.egg or not m.checksum_ok or m.hp == 0 or m.pid not in start or m.exp > start[m.pid]:
+                    continue
+                if m.level >= 100:
+                    continue
+                gain = share_exp_gain(r, fl, m, otid, trainer, lucky)
+                lv0, lv1, evos = share_exp_apply(r, m, gain, ever)
+                try:
+                    g.write_mon(slot, m)
+                except ValueError:
+                    continue                                      # game vừa đổi con này: bỏ qua lần này
+                rec['party'].append([r.species_name(m.species), lv0, lv1, gain])
+                rec['evolved'] += [['đội', r.species_name(a), r.species_name(b)] for a, b in evos]
+                evo_sp |= {b for _, b in evos}
+            for i in range(0, len(box), BOX_MON_SIZE):
+                c = bytes(box[i:i + BOX_MON_SIZE])
+                if not any(c) or not 1 <= cell_species(c) <= r.max_species:
+                    continue
+                m = box_to_party(r, c)
+                if m.egg or not m.checksum_ok or m.level >= 100:
+                    continue
+                gain = share_exp_gain(r, fl, m, otid, trainer, lucky)
+                lv0, lv1, evos = share_exp_apply(r, m, gain, ever)
+                box[i:i + BOX_MON_SIZE] = party_to_box(m)
+                rec['box'].append([i // BOX_MON_SIZE, r.species_name(m.species), lv0, lv1, gain])
+                rec['evolved'] += [['kho', r.species_name(a), r.species_name(b)] for a, b in evos]
+                evo_sp |= {b for _, b in evos}
+            if box != old:
+                g.write_box(addrs, old, box)
+        if evo_sp:
+            g.mark_dex(evo_sp)                                    # game cũng ghi Pokédex khi tiến hoá
+        if rec['party'] or rec['box']:
+            up = sum(1 for x in rec['party'] if x[2] > x[1]) + sum(1 for x in rec['box'] if x[3] > x[2])
+            self.exp_msg.append('chia EXP: %d con trong đội + %d con trong kho%s' % (
+                len(rec['party']), len(rec['box']), ', %d con lên level' % up if up else ''))
+        if rec['evolved']:
+            names = ['%s → %s' % (a, b) for _, a, b in rec['evolved']]
+            self.exp_msg.append('tiến hoá: ' + ', '.join(names[:4]) + (' và %d con khác' % (len(names) - 4) if len(names) > 4 else ''))
+            self.alert('✨ Tiến hoá nhờ chia EXP', ', '.join(names[:3]), None, False)
         try:
             with open(os.path.join(HERE, 'battle_log.jsonl'), 'a', encoding='utf-8') as fp:
                 fp.write(json.dumps(rec, ensure_ascii=False) + '\n')

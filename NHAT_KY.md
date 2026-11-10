@@ -128,3 +128,15 @@
 - GUI: quest_needs (túi, cờ huy hiệu 0x866+n, chiêu đội), quest_next_text = 🎯 MỤC TIÊU + CHUỖI VIỆC + TIẾP THEO, q_need_tgt (đường tím
   tới thứ thiếu đầu tiên), q_pick (🧭), chi tiết map thu gọn (không chấm số trên bản đồ khi thu). quest_where: "(trong nhà)" chỉ khi trùng
   tên thị trấn/route nhóm 0 (hang nhiều tầng không ghi). dev/show_quest_fake.py in thử tab Việc. t_quest_fake 33/33; mọi bài thử qua.
+
+## 2026-11-11 — chia EXP cho cả đội + kho PC, tự tiến hoá
+- Duy hỏi có share EXP vào kho không -> không (code AowVN/CFRU còn nhưng tắt: cần box_ptr + cờ Exp. Share của hack). Duy: làm, chia cho
+  toàn đội và kho, có tự tiến hoá.
+- pokeemerald: Cmd_getexp (battle_script_commands.c:3310-3392): calculatedExp = expYield*level/7, phần Exp. Share = /2 (>=1); Lucky Egg,
+  trainer, đổi tay mỗi cái *150/100 (Emerald không có x1.7 khác ngôn ngữ). GetEvolutionTargetSpecies (pokemon.c:5513-5579): duyệt hết
+  mục, khớp sau cùng thắng, HOLD_EFFECT_PREVENT_EVOLVE chặn. EXP gốc ở BaseStats +9 (Magikarp 20 đúng). Lucky Egg 197, Everstone 195.
+- Code: mm_core share_exp_gain / evolve_target / share_exp_apply, Rom.exp_yield / item_id; bỏ exp_share_gain, could_have_evolved,
+  EVO_LEVEL_METHODS, box_evolve, box_exp_share (CFRU, kho không mã hoá), Game.exp_share_on, App.log_battle. tick_battle: đầu trận chụp
+  (đội, đối thủ, trận trainer = battle_type & 8); trận mới chen giữa thì bỏ phần trận cũ (không ghi đội giữa trận); về bản đồ mới
+  finish_exp. Công tắc ⚙ "Chia EXP cho cả đội + kho PC..." (settings box_exp, mặc định bật).
+- Bài thử t_exp_fake 22/22 (công thức tính tay, tiến hoá, luồng trận giả); mọi bài thử qua.

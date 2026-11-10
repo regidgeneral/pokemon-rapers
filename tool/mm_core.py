@@ -477,6 +477,19 @@ class Rom:
         b, s = self.profile.species_info
         return self.d[self._o(b) + s * sp + off]
 
+    def exp_yield(self, sp):
+        """EXP gốc của loài (BaseStats +9, như gSpeciesInfo[].expYield)."""
+        b, s = self.profile.species_info
+        return self.d[self._o(b) + s * sp + 9]
+
+    def item_id(self, name):
+        """Mã vật phẩm theo tên trong ROM (vd 'LUCKY EGG'); 0 nếu không có."""
+        cache = self.__dict__.setdefault('_item_ids', {})
+        if not cache:
+            for i in range(1, self.max_item + 1):
+                cache.setdefault(self.item_name(i).strip(), i)
+        return cache.get(name, 0)
+
     def base_stats(self, sp):
         b, s = self.profile.species_info
         o = self._o(b) + s * sp
@@ -750,35 +763,6 @@ def make_roamer(rom, species, level, perfect=3, rng=None):
             + bytes(6) + bytes([3, mapnum]))
 
 
-# ---------------------------------------------------------------- Exp. Share cho kho PC
-def exp_share_gain(b, L, Lp, s=2, t=10, e=10, f=10, v=10):
-    """EXP một con nhận khi hạ 1 đối thủ — ExpCalculator của CFRU (công thức co giãn Gen 5/7, số nguyên).
-    b: EXP gốc Gen 7 của đối thủ, L: level đối thủ, Lp: level người nhận, s: 1 = ra trận, 2 = chỉ nhờ Exp. Share;
-    t/e/f/v (phần mười): đổi tay 15, Lucky Egg 15, thân thiết >= 220 thì 12, lẽ ra đã tiến hoá 12.
-    Đã khớp 12/12 số đo trong game (04/11)."""
-    x = (b * L) // (5 * s)
-    x = x * (2 * L + 10) ** 2 // ((L + Lp + 10) ** 2 * math.isqrt(L + Lp + 10))
-    x = x * math.isqrt(2 * L + 10) + 1
-    return max(1, min(1640000, x * t * e * v // 1000 * f // 10))
-
-
-# IsLevelUpEvolutionMethod của CFRU: các kiểu tiến hoá có param = level
-EVO_LEVEL_METHODS = {4, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 21, 22, 23, 28, 31, 32, 35}
-
-
-def could_have_evolved(rom, sp, level):
-    """CouldHaveEvolvedViaLevelUp của CFRU: có mục tiến hoá theo level mà level hiện tại đã đạt (dừng ở method 0)."""
-    tb, per = rom.profile.evo_table
-    o = rom._o(tb) + sp * per * 8
-    for k in range(per):
-        method, param = struct.unpack_from('<HH', rom.d, o + k * 8)
-        if method == 0:
-            break
-        if (method & 0xFF) in EVO_LEVEL_METHODS and level >= param:
-            return True
-    return False
-
-
 def prev_evolutions(rom):
     """{loài: {các loài tiến hoá thẳng ra nó}} theo bảng tiến hoá DPE (mọi kiểu tiến hoá). Dựng một lần cho mỗi ROM."""
     cache = rom.__dict__.get('_prev_evo')
@@ -825,66 +809,69 @@ def level_evolution(rom, sp, level):
     return target
 
 
-def box_evolve(rom, box):
-    """Đổi loài (sửa box tại chỗ) cho con đủ cấp, theo cả chuỗi nếu vượt nhiều mốc. Bỏ qua trứng và con cầm Everstone
-    (mã hiệu ứng 38, game cũng chặn ở 0x09655B64). Biệt danh chỉ đổi nếu đang là tên loài cũ, chiêu giữ nguyên.
-    Trả về [(ô, loài cũ, loài mới)]."""
-    p = rom.profile
-    recs, size = rom._o(p.item_recs[0]), p.item_recs[1]
-    out = []
-    for o in range(0, len(box) - p.box_size + 1, p.box_size):
-        first = sp = struct.unpack_from('<H', box, o + p.box_species)[0]
-        if not 1 <= sp <= p.max_species or struct.unpack_from('<I', box, o + 0x36)[0] >> 30 & 1:
-            continue
-        item = struct.unpack_from('<H', box, o + p.box_item)[0]
-        if item <= p.max_item and rom.d[recs + size * item + p.item_hold_off] == 38:
-            continue
-        exp = struct.unpack_from('<I', box, o + p.box_exp)[0]
-        seen = {sp}
-        while True:
-            to = level_evolution(rom, sp, rom.level_for(rom.growth(sp), exp))
-            if to is None or to in seen:
-                break
-            sp = to
-            seen.add(sp)
-        if sp == first:
-            continue
-        struct.pack_into('<H', box, o + p.box_species, sp)
-        if bytes(box[o + 8:o + 18]).split(b'\xff', 1)[0] == rom.species_name_bytes(first).split(b'\xff', 1)[0]:
-            box[o + 8:o + 18] = rom.species_name_bytes(sp)
-        out.append((o // p.box_size, first, sp))
-    return out
+# ---------------------------------------------------------------- chia EXP cho con không ra trận + kho PC (Duy 11/11)
+# Như Exp. Share của Emerald (battle_script_commands.c:3310-3392, Cmd_getexp): mỗi đối thủ bị hạ, phần Exp. Share =
+# EXP gốc x level đối thủ / 7 / 2 (ít nhất 1), rồi Lucky Egg x1.5, trận trainer x1.5, con đổi tay x1.5 (lần lượt, làm tròn
+# xuống). Tiến hoá như GetEvolutionTargetSpecies (pokemon.c:5513-5579), chỉ khi vừa lên level, cầm Everstone thì không.
+EVO_FRIENDSHIP, EVO_LEVEL, EVO_ATK_GT_DEF, EVO_ATK_EQ_DEF, EVO_ATK_LT_DEF = 1, 4, 8, 9, 10
+EVO_SILCOON, EVO_CASCOON, EVO_NINJASK = 11, 12, 13   # bỏ qua: ngày/đêm (2, 3), đổi tay/đá (5-7), Shedinja (14), Beauty (15)
 
 
-def box_exp_share(rom, foes, box, player_otid):
-    """Cộng EXP cho mọi Pokémon trong kho PC như một con đứng ngoài nhận Exp. Share (s = 2), lần lượt từng đối thủ
-    bị hạ (level người nhận tính lại giữa các đối thủ). Không có giới hạn level (CFRU mặc định không bật).
-    foes: [(loài, level)]; box: bytearray kho (sửa tại chỗ). Trả về số con được cộng."""
-    p = rom.profile
-    tb = rom._o(p.base_exp_table)
-    yields = [rom.d[tb + 2 * sp] | rom.d[tb + 2 * sp + 1] << 8 for sp, _ in foes]
-    count = 0
-    for o in range(0, len(box) - p.box_size + 1, p.box_size):
-        sp = struct.unpack_from('<H', box, o + p.box_species)[0]
-        if not 1 <= sp <= p.max_species:
-            continue
-        exp = struct.unpack_from('<I', box, o + p.box_exp)[0]
-        rate = rom.growth(sp)
-        top = rom.exp_for(rate, 100)
-        if exp >= top:
-            continue
-        t = 15 if struct.unpack_from('<I', box, o + 4)[0] != player_otid else 10
-        e = 15 if struct.unpack_from('<H', box, o + p.box_item)[0] == p.lucky_egg else 10
-        f = 12 if box[o + p.box_friend] >= 220 else 10
-        for y, (_, lf) in zip(yields, foes):
-            lp = rom.level_for(rate, exp)
-            if lp >= 100:
-                break
-            v = 12 if could_have_evolved(rom, sp, lp) else 10
-            exp = min(top, exp + exp_share_gain(y, lf, lp, 2, t, e, f, v))
-        struct.pack_into('<I', box, o + p.box_exp, exp)
-        count += 1
-    return count
+def share_exp_gain(rom, foes, mon, player_otid, trainer, lucky_egg):
+    """EXP con `mon` (không ra trận) nhận nhờ chia: foes = [(loài, level)] các đối thủ bị hạ."""
+    total = 0
+    for sp, lv in foes:
+        e = max(1, rom.exp_yield(sp) * lv // 7 // 2)
+        if mon.item == lucky_egg:
+            e = e * 150 // 100
+        if trainer:
+            e = e * 150 // 100
+        if mon.otid != player_otid:
+            e = e * 150 // 100
+        total += e
+    return total
+
+
+def evolve_target(rom, mon, everstone):
+    """Loài đích khi lên level (mục khớp sau cùng thắng, như game); None nếu không tiến hoá."""
+    if mon.item == everstone:
+        return None
+    tb, per = rom.profile.evo_table
+    o = rom._o(tb) + mon.species * per * 8
+    lv, target = mon.level, None
+    for k in range(per):
+        method, param, to = struct.unpack_from('<HHH', rom.d, o + k * 8)
+        hi = (mon.pid >> 16) % 10
+        ok = (method == EVO_FRIENDSHIP and mon.friendship >= 220
+              or method in (EVO_LEVEL, EVO_NINJASK) and lv >= param
+              or method == EVO_ATK_GT_DEF and lv >= param and mon.atk > mon.defn
+              or method == EVO_ATK_EQ_DEF and lv >= param and mon.atk == mon.defn
+              or method == EVO_ATK_LT_DEF and lv >= param and mon.atk < mon.defn
+              or method == EVO_SILCOON and lv >= param and hi <= 4
+              or method == EVO_CASCOON and lv >= param and hi > 4)
+        if ok and 1 <= to <= rom.max_species:
+            target = to
+    return target
+
+
+def share_exp_apply(rom, mon, gain, everstone):
+    """Cộng EXP (tối đa level 100), tính lại level + chỉ số (HP giữ phần đã mất như game), lên level thì tiến hoá (cả chuỗi
+    nếu vượt nhiều mốc; biệt danh đổi nếu đang là tên loài cũ). Trả về (level cũ, level mới, [(loài cũ, loài mới)])."""
+    lv0 = mon.level
+    mon.exp = min(rom.exp_for(rom.growth(mon.species), 100), mon.exp + gain)
+    mon.recalc(rom)
+    evos = []
+    while mon.level > lv0 and len(evos) < 3:
+        to = evolve_target(rom, mon, everstone)
+        if not to or to == mon.species or any(to == a for a, _ in evos):
+            break
+        old = mon.species
+        if bytes(mon.raw[8:18]).split(b'\xff', 1)[0] == rom.species_name_bytes(old).split(b'\xff', 1)[0]:
+            mon.raw[8:18] = rom.species_name_bytes(to)
+        mon.species = to
+        mon.recalc(rom)
+        evos.append((old, to))
+    return lv0, mon.level, evos
 
 
 # ---------------------------------------------------------------- chuyển đổi đội <-> kho PC (FireRed: ô kho = 80 byte đầu)
@@ -1168,14 +1155,6 @@ class Game:
                 for base in (sb2 + 0x28, sb2 + 0x5C) + tuple(sb1 + o for o in self.p.dex_seen_sb1):
                     a = base + (n >> 3)
                     self.b.write(a, bytes([self.b.read(a, 1)[0] | 1 << (n & 7)]))
-
-    def exp_share_on(self):
-        """Exp. Share đang bật trong game? None nếu game này chưa hỗ trợ."""
-        f = getattr(self.p, 'exp_share_flag', None)
-        if not f:
-            return None
-        first, base = self.p.randomizer['flag_ram']
-        return bool(self.b.read(base + (f - first) // 8, 1)[0] >> (f & 7) & 1)
 
     def read_box(self):
         """(danh sách địa chỉ các box, bytearray toàn bộ kho PC nối liền theo thứ tự box)."""
