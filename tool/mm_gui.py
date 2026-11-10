@@ -378,6 +378,8 @@ class App(tk.Tk):
             self.settings = {}
         self.auto_heal = tk.BooleanVar(value=bool(self.settings.get('auto_heal', True)))
         self.skip_nick = tk.BooleanVar(value=bool(self.settings.get('skip_nick', True)))   # Duy 11/11: bắt xong tự chọn NO
+        self.q_guide = tk.BooleanVar(value=bool(self.settings.get('quest_guide', True)))   # Duy 11/11: vẽ đường tới nhiệm vụ
+        self.q_step, self.q_prog, self.q_cur_i = None, None, None
         self.box_exp = tk.BooleanVar(value=bool(self.settings.get('box_exp', True)))
         self.shiny_boost = tk.BooleanVar(value=bool(self.settings.get('shiny_boost', True)))
         self.alert_on = tk.BooleanVar(value=bool(self.settings.get('alert', True)))   # báo shiny / nên bắt
@@ -429,6 +431,8 @@ class App(tk.Tk):
         save = self.save_area_state
         m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận + xoá trạng thái xấu trong trận', variable=self.auto_heal,
                           command=save)
+        m.add_checkbutton(label='Dẫn đường nhiệm vụ (đường tím tới bước cốt truyện tiếp theo)', variable=self.q_guide,
+                          command=lambda: (save(), self.guard(self.quest_render)()))
         m.add_checkbutton(label='Bắt xong không đặt biệt danh (tự chọn NO)', variable=self.skip_nick,
                           command=lambda: (save(), setattr(self, '_nick_sent', None)))   # gửi Lua ngay nhịp tới
         m.add_separator()
@@ -1021,7 +1025,8 @@ class App(tk.Tk):
         try:
             with open(self.settings_file, 'w', encoding='utf-8') as fp:
                 json.dump({'hide_caught': self.hide_caught.get(), 'wild_zone': self.q_wild_on.get(),
-                           'auto_heal': self.auto_heal.get(), 'skip_nick': self.skip_nick.get(), 'box_exp': self.box_exp.get(),
+                           'auto_heal': self.auto_heal.get(), 'skip_nick': self.skip_nick.get(),
+                           'quest_guide': self.q_guide.get(), 'box_exp': self.box_exp.get(),
                            'shiny_boost': self.shiny_boost.get(), 'alert': self.alert_on.get(),
                            'roam_auto': self.roam_auto.get(), 'roam_timer': round(self.roam_timer),
                            'roam_spawned': self.roam_spawned, 'fly_origin': self.fly_origin, 'fly_landed': self.fly_landed,
@@ -2313,6 +2318,8 @@ class App(tk.Tk):
         self.q_stext.pack(fill='both', expand=True)
         self.q_stext.tag_configure('head', font=('Segoe UI', 11, 'bold'), spacing1=10)
         self.q_stext.tag_configure('done', foreground='#9a9a9a')
+        self.q_stext.tag_configure('cur', foreground='#6a1b9a', font=('Segoe UI', 10, 'bold'), background='#f3e5f5')
+        self.q_stext.tag_configure('curdet', foreground='#6a1b9a', font=('Segoe UI', 9))
         self.q_stext.tag_configure('hint', foreground='#666', font=('Segoe UI', 9, 'italic'))
         self.q_nb.bind('<<NotebookTabChanged>>', lambda e: self.guard(self.quest_subtab)())
         self.q_fshown, self.q_auto, self.q_witems, self.q_lastfoe = None, False, {}, None
@@ -2441,7 +2448,9 @@ class App(tk.Tk):
         if self.q_shown and not self.q_find.get().strip():
             flag = self.game.flags()
             sig = tuple(self.story.status(r, flag) for r in self.story.rows(*self.q_shown))
-            if sig != self.q_sig:                             # vừa nhặt/đánh xong -> vẽ lại danh sách + chấm
+            old_i = self.q_cur_i
+            self.quest_progress(flag)
+            if sig != self.q_sig or self.q_cur_i != old_i:    # vừa nhặt/đánh xong / xong bước cốt truyện -> vẽ lại
                 self.quest_render()
                 return
         if gn == self.q_shown and not self.q_follow.get():   # tự tới đúng map đang xem (vd bay tới huyền thoại)
@@ -3048,6 +3057,90 @@ class App(tk.Tk):
         self.hunt_goal = tuple(goal) if goal else None
         self.save_area_state()
 
+    # ---------------------------------------------------------------- dẫn đường nhiệm vụ (Duy 11/11)
+    def guide_goal(self):
+        """(map, ô hoặc None, nhãn) đang dẫn tới: chỉ đường săn (hunt_goal) trước, không thì bước cốt truyện hiện tại."""
+        if self.hunt_goal:
+            return self.hunt_goal, None, 'săn'
+        s = getattr(self, 'q_step', None)
+        if s and self.q_guide.get():
+            return s['map'], s['xy'], s['who']
+        return None
+
+    def guide_route(self, frm):
+        """[map...] từ frm tới map đích; không có đường (vd cáp treo, thuyền) thì tới chỗ trung gian `via` của bước."""
+        g = self.guide_goal()
+        if not g or not frm:
+            return None
+        path = self.route_path(frm, g[0])
+        s = getattr(self, 'q_step', None)
+        if not path and not self.hunt_goal and s and s.get('via') and frm != s['via'][0]:
+            path = self.route_path(frm, s['via'][0])
+        return path
+
+    def guide_tiles(self, m):
+        """Ô đích trên map m: cạnh NPC / điểm nhiệm vụ nếu m là map đích; không thì cửa hoặc mép map dẫn sang chặng kế."""
+        g = self.guide_goal()
+        if not g:
+            return set()
+        s = getattr(self, 'q_step', None)
+        spots = []
+        if m == g[0] and g[1]:
+            spots.append(g[1])
+        elif not self.hunt_goal and s and s.get('via') and m == s['via'][0]:
+            spots.append(s['via'][1])
+        if spots:
+            return {(x + dx, y + dy) for x, y in spots for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1))}
+        path = self.guide_route(m)
+        if not path or len(path) < 2:
+            return set()
+        _, nxt, edge, tiles = self.route_steps(path)[0]
+        if tiles:
+            return set(tiles)
+        info = self.story.map_info(*m)
+        w, h = info['w'], info['h']
+        return {'Bắc': {(x, 0) for x in range(w)}, 'Nam': {(x, h - 1) for x in range(w)},
+                'Tây': {(0, y) for y in range(h)}, 'Đông': {(w - 1, y) for y in range(h)}}.get(edge, set())
+
+    def quest_path_draw(self):
+        """Đường tím từng ô từ nhân vật tới cửa / mép map của chặng kế, hoặc tới NPC nhiệm vụ (map đang đứng)."""
+        cv, k = self.q_cv, self.q_scale * 16
+        cv.delete('qpath')
+        if self.q_shown != self.q_cur or not self.q_player:
+            return
+        tiles = self.guide_tiles(self.q_shown)
+        path = self.story.walk_path(*self.q_shown, self.q_player, tiles) if tiles else None
+        if not path or len(path) < 2:
+            return
+        pts = [c for x, y in path for c in (x * k + k // 2, y * k + k // 2)]
+        wd = max(4, k // 4)
+        cv.create_line(*pts, fill='white', width=wd + 4, capstyle='round', joinstyle='round', tags='qpath')
+        cv.create_line(*pts, fill='#d500f9', width=wd, capstyle='round', joinstyle='round', arrow='last',
+                       arrowshape=(wd * 3, wd * 3, wd * 1.5), tags='qpath')
+        cv.tag_raise('player')
+
+    def quest_target_draw(self):
+        """Ngôi sao + tên ở ô nhiệm vụ khi đang xem đúng map đích (hoặc chỗ trung gian như cáp treo)."""
+        cv, k = self.q_cv, self.q_scale * 16
+        cv.delete('qtarget')
+        g, s = self.guide_goal(), getattr(self, 'q_step', None)
+        if not g or not g[1]:
+            return
+        spot, label = None, None
+        if self.q_shown == g[0]:
+            spot, label = g[1], '★ NHIỆM VỤ: ' + g[2]
+        elif s and s.get('via') and self.q_shown == s['via'][0]:
+            spot, label = s['via'][1], '★ đi tiếp từ đây'
+        if not spot:
+            return
+        x, y = spot[0] * k + k // 2, spot[1] * k + k // 2
+        r = max(12, k // 2 + 4)
+        cv.create_oval(x - r, y - r, x + r, y + r, outline='#ffd600', width=4, tags='qtarget')
+        t = cv.create_text(x, y - r - 4, text=label, anchor='s', fill='white', font=('Segoe UI', 9, 'bold'), tags='qtarget')
+        bg = cv.create_rectangle(*[a + b for a, b in zip(cv.bbox(t), (-4, -2, 4, 2))], fill='#e65100', outline='white',
+                                 tags='qtarget')
+        cv.tag_lower(bg, t)
+
     def route_path(self, cur, goal):
         """[map...] đường ngắn nhất từ cur tới goal (đi qua mép map + cửa/hang/cầu thang), None nếu không có (≤ 16 map)."""
         cache = self.__dict__.setdefault('_route_cache', {})
@@ -3094,10 +3187,12 @@ class App(tk.Tk):
 
     @staticmethod
     def route_how(edge, tiles):
+        """Không nói hướng (Duy 11/11: hướng đổi theo từng cảnh); đường tím trên bản đồ chỉ chỗ."""
         if tiles:
-            return 'vào cửa ô ' + ' / '.join('%d,%d' % t for t in tiles[:3])
-        way = {'Bắc': 'lên trên', 'Nam': 'xuống dưới', 'Tây': 'sang trái', 'Đông': 'sang phải'}.get(edge)
-        return ('đi ra mép %s (%s)' % (edge, way) if way else 'đi ra mép %s' % edge) if edge else 'đi sang'
+            return 'theo đường tím vào cửa (khung tím)'
+        if edge in ('lặn xuống', 'nổi lên'):
+            return 'dùng Dive (%s) ở chỗ nước sâu' % edge
+        return 'theo đường tím ra khỏi map'
 
     def route_text(self, path):
         """'PEWTER CITY → (đi ra mép Nam) → ROUTE 2 → …' (một dòng, cho thanh trạng thái)."""
@@ -3109,17 +3204,24 @@ class App(tk.Tk):
 
     def route_render_text(self, T):
         """Mục 🧭 ĐƯỜNG TỚI … ở đầu danh sách bên trái; chặng của map đang xem in đậm."""
-        if not self.hunt_goal or not self.q_cur:
+        goal = self.guide_goal()
+        if not goal or not self.q_cur:
             return None
-        path = self.route_path(self.q_cur, self.hunt_goal)
-        goal = self.rom.map_name(*self.hunt_goal)
-        T.insert('end', '🧭 ĐƯỜNG TỚI %s%s  ' % (goal, ' (săn %s)' % self.rom.species_name(self.hunt_target)
-                                                  if self.hunt_target else ''), 'head')
-        T.insert('end', '✕ bỏ chỉ đường\n', ('route_x', 'rx'))
-        T.tag_bind('rx', '<Button-1>', lambda e: (self.route_set(None), self.guard(self.quest_render)()))
+        if self.q_cur == goal[0]:
+            if not self.hunt_goal:
+                T.insert('end', '🧭 Bạn đang ở đúng map nhiệm vụ: đi theo đường tím tới ★ rồi nói chuyện.\n', 'route_now')
+            return None
+        path = self.guide_route(self.q_cur)
+        if self.hunt_goal:
+            T.insert('end', '🧭 ĐƯỜNG TỚI %s%s  ' % (self.rom.map_name(*goal[0]), ' (săn %s)' % self.rom.species_name(
+                self.hunt_target) if self.hunt_target else ''), 'head')
+            T.insert('end', '✕ bỏ chỉ đường\n', ('route_x', 'rx'))
+            T.tag_bind('rx', '<Button-1>', lambda e: (self.route_set(None), self.guard(self.quest_render)()))
+        else:
+            T.insert('end', '🧭 ĐƯỜNG ĐI\n', 'head')
         if not path:
-            T.insert('end', '• Không tìm được đường từ map này (có thể phải bay, hoặc cần Surf / sự kiện mở đường).\n',
-                     'route')
+            T.insert('end', '• Tool không tìm được đường đi bộ từ map này (có thể phải đi thuyền, cáp treo, bay, hoặc cần '
+                            'Surf / sự kiện mở đường). Bấm "Xem chỗ nhiệm vụ" để xem nơi cần tới.\n', 'route')
             return None
         for i, (m, nxt, edge, tiles) in enumerate(self.route_steps(path)):
             now = m == self.q_shown
@@ -3127,7 +3229,8 @@ class App(tk.Tk):
                                                     self.route_name(m, path[i - 1] if i else None),
                                                     self.route_how(edge, tiles), self.route_name(nxt, m)),
                      'route_now' if now else 'route')
-        T.insert('end', 'Khung / dải tím trên bản đồ = chỗ cần đi tới. Tới nơi thì tự tắt.\n', 'hint')
+        T.insert('end', 'Đường tím trên bản đồ = đường đi từ chỗ bạn đứng.%s\n' % (' Tới nơi thì tự tắt.' if self.hunt_goal
+                                                                                    else ''), 'hint')
         return path
 
     def route_draw(self, path):
@@ -3837,6 +3940,7 @@ class App(tk.Tk):
             self.quest_cam_resume(see=False)                  # đi tiếp vài bước = quay lại chơi -> theo lại
             self.quest_see(x, y)
         self.q_player = (x, y)
+        self.quest_path_draw()
 
     def quest_near_edge(self, x, y, margin=3):
         """Nhân vật cách mép khung nhìn < margin ô (hoặc ra ngoài) -> cần cuộn."""
@@ -3964,6 +4068,8 @@ class App(tk.Tk):
         self.quest_sum_label()
         have = self.quest_have()
         guide = st.guide(g, n, flag, have)
+        self.quest_progress(flag)
+        self.quest_next_text(T)
         rpath = self.route_render_text(T)
         self.q_sig = tuple(st.status(r, flag) for r in st.rows(g, n))
         self.q_entries, self.q_marks, num = [], {}, 0
@@ -4023,6 +4129,7 @@ class App(tk.Tk):
             cv.tag_bind(tag, '<Enter>', lambda ev: cv.configure(cursor='hand2'))
             cv.tag_bind(tag, '<Leave>', lambda ev: cv.configure(cursor=''))
         self.route_draw(rpath)
+        self.quest_target_draw()
         self.q_player = None
         try:
             self.quest_player()
@@ -4069,24 +4176,81 @@ class App(tk.Tk):
             self.q_det_i = i
         T.configure(state='disabled')
 
+    # ------------------------------------------------------------ cốt truyện Emerald theo bước (Duy 11/11, mm_quest)
+    def quest_progress(self, flag=None):
+        """Đọc cờ + biến -> self.q_prog [(bước, xong)], self.q_cur_i, self.q_step (None nếu xong hết / không đọc được)."""
+        import mm_quest
+        try:
+            flag = flag or self.game.flags()
+            prog, cur = mm_quest.progress(flag, self.game.vars())
+        except BridgeError:
+            return
+        self.q_prog, self.q_cur_i = prog, cur
+        self.q_step = mm_quest.STEPS[cur] if cur is not None else None
+
+    def quest_where(self, s):
+        nm = self.rom.map_name(*s['map'])
+        inner = any(self.rom.map_name(*x[:2]) == nm for x in self.q_maps if (x[0], x[1]) != s['map']) and s['map'][0] > 0
+        return '%s%s — %s' % (nm, ' (trong nhà / tầng khác)' if inner else '', s['who'])
+
+    def quest_show_step(self, s):
+        """Mở map của bước và đưa khung nhìn tới ô nhiệm vụ."""
+        self.q_nb.select(0)
+        self.quest_open(s['map'])
+        self.quest_cam_pause()
+        self.quest_see(*s['xy'])
+
+    def quest_next_text(self, T):
+        """Khung ➜ BƯỚC TIẾP THEO đầu tab Việc: làm gì, cần gì, ở đâu (không chỉ hướng; đường tím vẽ trên bản đồ)."""
+        prog, s = getattr(self, 'q_prog', None), getattr(self, 'q_step', None)
+        if not prog:
+            return
+        n_done = sum(1 for _, d in prog if d)
+        if s is None:
+            T.insert('end', '🏆 Đã xong cốt truyện chính (%d/%d bước) — đã vào Đại sảnh Danh vọng.\n' % (n_done, len(prog)),
+                     'head')
+            return
+        T.insert('end', '➜ BƯỚC TIẾP THEO (%d/%d)\n' % (self.q_cur_i + 1, len(prog)), 'head')
+        T.insert('end', s['do'] + '\n', 'route_now')
+        if s['need']:
+            T.insert('end', 'Cần: %s\n' % s['need'], 'route')
+        T.insert('end', 'Ở đâu: %s  ' % self.quest_where(s), 'route')
+        T.insert('end', '[xem chỗ nhiệm vụ]\n', ('route_x', 'qshow'))
+        T.tag_bind('qshow', '<Button-1>', lambda e, s=s: self.guard(self.quest_show_step)(s))
+        if not self.q_guide.get():
+            T.insert('end', 'Dẫn đường nhiệm vụ đang tắt (⚙ Cài đặt).\n', 'hint')
+        T.insert('end', '\n')
+
     def quest_story(self, flag=None, have=None):
-        """Tab con 📖 Cốt truyện: 8 huy hiệu + vật phẩm then chốt; bấm dòng = mở map nơi làm bước đó."""
-        st, T = self.story, self.q_stext
-        if flag is None:
-            flag, have = self.game.flags(), self.quest_have()
+        """Tab con 📖 Cốt truyện: mọi bước theo thứ tự (✔ xong, ➜ đang làm); bấm dòng = mở map + chỗ nhiệm vụ."""
+        T = self.q_stext
+        self.quest_progress(flag)
+        prog, cur = getattr(self, 'q_prog', None), getattr(self, 'q_cur_i', None)
         T.configure(state='normal')
         T.delete('1.0', 'end')
-        for k, (head, entries) in enumerate(st.main_story(flag, have)):
-            T.insert('end', head + '\n', 'head')
-            for j, e in enumerate(entries):
-                tag = 's%d_%d' % (k, j)
-                mark = '✔ ' if e['done'] else '⬜ ' if e['done'] is False else '• '
-                T.insert('end', mark + e['text'] + '\n', (tag, 'done') if e['done'] else (tag,))
-                if e['maps']:
-                    T.tag_bind(tag, '<Button-1>', lambda ev, m=e['maps'][0]: (self.q_nb.select(0),
-                                                                               self.guard(self.quest_open)(m)))
-        T.insert('end', '\nBấm một dòng để mở map nơi làm bước đó.', 'hint')
+        if not prog:
+            T.insert('end', 'Chưa đọc được game.', 'hint')
+            T.configure(state='disabled')
+            return
+        n_done = sum(1 for _, d in prog if d)
+        T.insert('end', '📜 CỐT TRUYỆN CHÍNH — xong %d/%d bước\n' % (n_done, len(prog)), 'head')
+        for i, (s, d) in enumerate(prog):
+            tag = 'st%d' % i
+            mark = '✔ ' if d else '➜ ' if i == cur else '⬜ '
+            line = '%s%d. %s%s\n' % (mark, i + 1, s['do'], '  (tuỳ chọn)' if s.get('optional') else '')
+            tags = (tag, 'done') if d else (tag, 'cur') if i == cur else (tag,)
+            T.insert('end', line, tags)
+            if i == cur:
+                T.insert('end', '      Ở đâu: %s%s\n' % (self.quest_where(s), ('. Cần: ' + s['need']) if s['need'] else ''),
+                         'curdet')
+            T.tag_bind(tag, '<Button-1>', lambda ev, s=s: self.guard(self.quest_show_step)(s))
+        T.insert('end', '\nBấm một bước để xem chỗ đó trên bản đồ. Các bước theo cờ/biến của game (nguồn: pokeemerald).',
+                 'hint')
         T.configure(state='disabled')
+        if cur is not None:
+            rng = T.tag_ranges('st%d' % cur)
+            if rng:
+                T.see(rng[0])
 
     def quest_unlock_all(self):
         """Nút 🔓: sao lưu .sav rồi ghi gói A (Game.unlock_all). Chỉ đổi RAM: chưa lưu game thì tắt mGBA là mất."""

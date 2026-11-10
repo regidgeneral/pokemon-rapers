@@ -1330,6 +1330,15 @@ class Game:
                 added.append(self.rom.item_name(it))
         return added
 
+    def vars(self):
+        """Hàm biến (0x4000..0x40FF) -> giá trị u16 theo RAM hiện tại (SaveBlock1 + vars_off); một lệnh đọc."""
+        raw = self.b.read(self.sb1() + self.p.vars_off, 0x200)
+
+        def get(v):
+            i = v - 0x4000
+            return struct.unpack_from('<H', raw, 2 * i)[0] if 0 <= i < 0x100 else None
+        return get
+
     def player_xy(self):
         """Ô người chơi đang đứng trên map (toạ độ object trừ lề 7 ô)."""
         x, y = struct.unpack('<hh', self.b.read(self.p.player_obj + 0x10, 4))

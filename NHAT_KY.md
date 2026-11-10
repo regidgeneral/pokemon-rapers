@@ -94,3 +94,17 @@
   (không dọn gì thêm); 4 = nhảy qua. -> Lua lệnh N: mỗi khung hình, lệnh 0xF3 và bước <= 1 -> ghi 4 (khung YES/NO không kịp hiện).
 - Python: Game.set_skip_nick, App.sync_skip_nick (15 giây/lần + khi đổi công tắc), Lua cũ -> giữ cách bấm B.
   Lua đang chạy trả "ERR cmd N" (chưa nạp lại). Không có trình Lua trên máy -> chưa soát được cú pháp ngoài mGBA.
+
+## 2026-11-11 — làm lại phần nhiệm vụ: bước cốt truyện + đường tím
+- Duy kẹt ở Slateport, tab Việc/Cốt truyện không giúp: main_story dùng cờ huy hiệu FR (0x820), chỉ quét script, không có thứ tự.
+  Duy: bỏ kiểu "đi về phía đông", nói nhiệm vụ cần gì / ở đâu / làm gì, vẽ đường từ nhân vật tới chỗ nhiệm vụ.
+- RAM thật: 2 huy hiệu, FLAG_DELIVERED_STEVEN_LETTER, còn DEVON GOODS -> bước tiếp = Captain Stern (OceanicMuseum_2F scripts.inc:72).
+- Tra pokeemerald: script truy ngược setflag/setvar -> NPC/coord event trong map.json -> (map, ô); map_groups.json -> (nhóm, số),
+  khớp tên map ROM. Biến: VAR_PETALBURG_GYM_STATE 2, VAR_ROUTE110_STATE 1, VAR_METEOR_FALLS_STATE 1, VAR_SLATEPORT_CITY_STATE 1/2
+  (Magma Hideout / cảng), VAR_SOOTOPOLIS_CITY_STATE 2/5. SYSTEM_FLAGS = 0x860 (flags.h:1348).
+- Code: mm_quest.py (41 bước, sinh từ dev/gen_quest.py), Game.vars, Story.walk_path (BFS lưới va chạm, đổi độ cao qua ô 0/15),
+  App.guide_goal/guide_route/guide_tiles/quest_path_draw/quest_target_draw/quest_progress/quest_next_text/quest_story mới;
+  route_how bỏ chữ hướng. Xoá main_story + world_index (không còn ai gọi). Thử thật đường: Slateport (21,15) -> cửa bảo tàng (30,26)
+  -> cầu thang 1F (6,1) -> Stern 2F; xem ảnh vẽ thử đúng.
+- Bài thử t_quest_fake 18/18 (dữ liệu, bước hiện tại, giao diện giả ở Slateport). t_fish_fake hỏng vì settings.json thật đang săn
+  ABRA (hộp thoại giả trả "Không") -> bài thử tự bỏ hunt_target. Mọi bài thử qua.

@@ -16,6 +16,7 @@ if not getattr(p, 'fishing', None):                 # Emerald 10/11: chưa dò t
     print('BỎ QUA: hồ sơ %s chưa có câu cá' % p.title)
     sys.exit(0)
 F = p.fishing
+app.hunt_target = None                              # không phụ thuộc loài đang săn trong settings.json thật (11/11: ABRA)
 ok = fail = 0
 
 

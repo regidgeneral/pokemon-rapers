@@ -26,7 +26,7 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 ## Lệnh (chạy trong `tool\`, kèm `PYTHONIOENCODING=utf-8` khi in ra file)
 | Việc | Lệnh |
 |---|---|
-| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (câu cá Emerald) · `dev\t_unlock_fake.py` (mở khoá) · `dev\t_save_fake.py` (tự lưu, chấm IV) · `dev\t_status_fake.py` (xoá trạng thái trong trận, bỏ đặt biệt danh) |
+| Bài thử | `py -3 dev\t_frmon.py` (mã hoá + dữ liệu ROM Emerald) · `dev\t_box_fake.py` · `dev\t_gui_fake.py` · `dev\t_race_fake.py` · `dev\t_fish_fake.py` (câu cá Emerald) · `dev\t_unlock_fake.py` (mở khoá) · `dev\t_save_fake.py` (tự lưu, chấm IV) · `dev\t_status_fake.py` (xoá trạng thái trong trận, bỏ đặt biệt danh) · `dev\t_quest_fake.py` (nhiệm vụ cốt truyện + đường tím) |
 | Đọc game đang chạy | `py -3 dev\peek_em.py` / `dev\watch_em.py` |
 | Đồng bộ | `py -3 save_sync.py start` · `pull` · `push` · `status` · `code` |
 | Máy mới | `py -3 save_sync.py setup https://github.com/regidgeneral/pokemon-rapers.git` hoặc `CaiDat_LanDau.bat` |
@@ -55,5 +55,6 @@ Tách từ tool FireRed (`E:\PokemonFR`, repo `regidgeneral/pokemon-fire-red`) n
 **Mở khoá săn shiny, gói A (11/11):** nút 🔓 ở tab 📖 Cốt truyện → `Game.unlock_all`: 8 huy hiệu, Bay 16 thị trấn, giày chạy, National Dex (cờ + biến 0x4046 + SaveBlock2), HM01-08, 3 cần, 2 xe đạp, Go-Goggles, Devon Scope. KHÔNG cờ phá đảo, không biến cốt truyện/cờ ẩn NPC/trainer/huyền thoại (Duy chốt). ☐ Chưa bấm thật. Gói B (tua cốt truyện từng chuỗi để mở huyền thoại) = làm riêng khi Duy cần.
 **Xoá trạng thái xấu trong trận (11/11, Duy chốt MỌI trận khi bật Tự hồi):** `Game.cure_battle_status` gọi từ `tick_battle` lúc controller = chọn lệnh; gBattleMons[0] (+[2] trận đôi) status1 +0x4C, ghi có điều kiện. ✅ Đã chạy thật: Treecko ngủ (status1 0x2) -> 0. Không đụng status2 (lú lẫn...).
 **Bắt xong không đặt biệt danh (11/11, công tắc ⚙ `skip_nick`, mặc định bật):** `Game.nickname_prompt` = Lua lệnh `N` (mỗi khung hình: lệnh 0xF3 trygivecaughtmonnick ở bước ≤ 1 -> ghi bước = 4, như bấm B; battle_script_commands.c:10220-10292); tool gửi N 15 giây/lần + khi đổi công tắc; Lua cũ -> Python bấm B mỗi giây (trượt khi bấm A dồn: lần đầu 11/11 vào màn đặt tên SHROOMISH). ☐ Bản Lua chưa chạy thật.
+**Nhiệm vụ cốt truyện (11/11, Duy: "không chỉ hướng, vẽ đường tới chỗ nhiệm vụ"):** `mm_quest.py` = 41 bước tới Đại sảnh Danh vọng, SINH bằng `dev\gen_quest.py` từ pokeemerald (cờ/biến + map + ô NPC, nguồn file:dòng từng bước). Tab 📋 Việc: khung ➜ BƯỚC TIẾP THEO (làm gì / cần gì / ở đâu); 📖 Cốt truyện: đủ bước ✔/➜. Bản đồ: ★ ở NPC, đường tím từng ô (`Story.walk_path`, lưới va chạm + độ cao) từ nhân vật tới cửa/mép/NPC; giữa các map dùng `route_path`; chữ không còn hướng. Công tắc ⚙ `quest_guide`. Chỉ đường săn (hunt_goal) được ưu tiên. Bước 15 (gym Wattson) không có đường đi bộ (hàng rào điện). ☐ Chưa xem trên tool thật.
 **☐ Chưa dò:** roamer Latios/Latias (game tự thả khi nói chuyện mẹ sau Đại sảnh Danh vọng, players_house.inc:438-446).
 **☐ Máy nhà:** chưa nối. **☐ Chưa có `so_do/`.**

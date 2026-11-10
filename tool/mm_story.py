@@ -474,87 +474,6 @@ class Story:
                ('⬜ CÒN TRÊN MAP NÀY', todo), ('🚪 LỐI ĐI', ways), ('✅ ĐÃ XONG', ok)]
         return [(t, es) for t, es in out if es]
 
-    # ------------------------------------------------------------ cốt truyện chính (bước 4)
-    def world_index(self):
-        """Quét mọi script mọi map một lần: huy hiệu được bật ở đâu, vật phẩm then chốt nhận/dùng ở đâu."""
-        if 'world' in self._scripts:
-            return self._scripts['world']
-        R = self.rom
-        badge, got, used = {}, {}, {}
-        key_pocket = getattr(self.p, 'key_pocket', None)
-        self.hm_item(0)
-        hm_items = {v for v in self._hm.values() if v and R.item_name(v).startswith('HM')} | {self.hm_item(148)}
-        for g, n in self.maps():
-            info = self.map_info(g, n)
-            evs = [('npc', e) for e in info['npcs']] + [('trigger', e) for e in info['triggers']] + \
-                  [('sign', e) for e in info['signs']] + [('map', e) for e in info['map_scripts']]
-            for kind, e in evs:
-                fs = e.get('facts') or []
-                where = dict(map=(g, n), x=e.get('x'), y=e.get('y'))
-                trs = [self.trainer_name(f[1]) for f in fs if f[0] == 'trainer' and f[2] != 5]
-                for f in fs:
-                    if f[0] == 'set_flag' and 0x820 <= f[1] <= 0x827:
-                        badge.setdefault(f[1] - 0x81F, []).append(dict(where, who=trs[0] if trs else ''))
-                    if f[0] in ('give_item', 'find_item') and (R.item_pocket(f[1]) - 1 == key_pocket or f[1] in hm_items):
-                        got.setdefault(f[1], []).append(dict(where, how='nhặt được' if f[0] == 'find_item' else 'được cho',
-                                                             conds=sorted({self.pretty(c) for c in f[-1] if c.startswith('cờ 082')})))
-                    if f[0] == 'need_item' and (R.item_pocket(f[1]) - 1 == key_pocket or f[1] in hm_items):
-                        say = next((x[1] for x in fs if x[0] == 'text'), '')
-                        used.setdefault(f[1], []).append(dict(where, say=say))
-        # Flash không cần vật phẩm trong script: dùng ở các map tối
-        flash = self.hm_item(148)
-        if flash:
-            for g, n in self.maps():
-                if self.u8(self.header(g, n) + 21):
-                    used.setdefault(flash, []).append(dict(map=(g, n), x=None, y=None, say='hang tối'))
-        self._scripts['world'] = (badge, got, used)
-        return badge, got, used
-
-    def main_story(self, flag, have):
-        """[(tiêu đề, [mục])] cho phần Cốt truyện: huy hiệu theo thứ tự + vật phẩm then chốt (nhận ở đâu, dùng ở đâu)."""
-        R = self.rom
-        badge, got, used = self.world_index()
-        mname = lambda w: '%s%s' % (R.map_name(*w['map']), ' (ô %d,%d)' % (w['x'], w['y']) if w.get('x') is not None else '')
-        bad = []
-        nxt = None
-        for k in range(1, 9):
-            on = flag(0x81F + k) if flag else None
-            ws = badge.get(k, [])
-            seen, places = set(), []
-            for w in ws:
-                if w['map'] not in seen:
-                    seen.add(w['map'])
-                    places.append(w)
-            who = next((w['who'] for w in ws if w['who']), '')
-            t = 'Huy hiệu %d: %s%s' % (k, 'đánh %s ở ' % who if who else '',
-                                      ', '.join(R.map_name(*w['map']) for w in places) or 'chưa tìm thấy trong script')
-            e = dict(text=t, done=bool(on) if on is not None else None, maps=[w['map'] for w in places])
-            if not on and nxt is None:
-                nxt = k
-                e['text'] = '➜ TIẾP THEO — ' + t
-            bad.append(e)
-        keys = []
-        order = sorted(set(got) | set(used), key=lambda i: (i in have, min((w['map'] for w in got.get(i, [])), default=(99, 99)), i))
-        for it in order:                                   # chưa có lên trước; TM chỉ giữ cái dùng để qua đường (Flash)
-            if R.item_name(it).startswith('TM') and it not in used:
-                continue
-            gs, us = got.get(it, []), used.get(it, [])
-            src = '; '.join('%s %s%s' % (w['how'], mname(w), (' [%s]' % ', '.join(w['conds'])) if w['conds'] else '')
-                            for w in gs[:3]) or 'chưa thấy chỗ nhận (có thể mua hoặc nhận qua sự kiện riêng)'
-            dst = sorted({R.map_name(*w['map']) for w in us})
-            use = ('Dùng ở: %s' % ', '.join(dst[:6]) + (' và %d nơi khác' % (len(dst) - 6) if len(dst) > 6 else '')) if dst else ''
-            keys.append(dict(text='%s %s — Nhận: %s%s' % (R.item_name(it), '✔ đã có' if it in have else '✘ chưa có', src,
-                                                          ('. ' + use) if use else ''),
-                             done=it in have, maps=[w['map'] for w in gs] + [w['map'] for w in us]))
-        head = []
-        if nxt:
-            b = bad[nxt - 1]
-            head.append(dict(text='Mục tiêu chính hiện tại: %s' % b['text'].replace('➜ TIẾP THEO — ', ''), done=None, maps=b['maps']))
-        head.append(dict(text='Thứ tự huy hiệu theo cờ của game (1 → 8); vật phẩm then chốt sắp theo nơi nhận, chưa có lên trước. '
-                              'Thứ tự lấy vật phẩm giữa các huy hiệu: chưa chắc (tool không đoán theo FireRed gốc).', done=None, maps=[]))
-        return [('📜 BẠN ĐANG Ở ĐÂU TRONG CỐT TRUYỆN', head), ('🏅 HUY HIỆU (theo thứ tự)', bad),
-                ('🔑 VẬT PHẨM THEN CHỐT & HM/TM ĐỂ QUA ĐƯỜNG', keys)]
-
     # ------------------------------------------------------------ hình nhân vật (overworld)
     def ow_sprite(self, gfx, facing=1):
         """Ảnh RGBA đứng yên theo hướng (khung 0 xuống, 1 lên, 2 trái; phải = lật trái); None nếu không đọc được."""
@@ -687,6 +606,43 @@ class Story:
                     out[i % w, i // w] = attr[mid]
             self._scripts[key] = out
         return self._scripts[key]
+
+    def walk_path(self, g, n, start, goals):
+        """[(x, y)...] đường ngắn nhất từ start tới một ô trong goals trên lưới va chạm của map (Duy 11/11: vẽ đường tới
+        nhiệm vụ). Ô đi được = va chạm (bit 10-11) = 0; đổi độ cao (bit 12-15) chỉ qua ô độ cao 0/15 như game (đất <-> nước
+        cần Surf). Ô đích luôn vào được (cửa, NPC). Không tính NPC đứng chắn, gờ nhảy một chiều.
+        Theo độ cao không có đường -> thử bỏ độ cao; vẫn không -> None."""
+        from collections import deque
+        lay = self.u32(self.header(g, n))
+        w, h, _, blocks = struct.unpack_from('<iiII', self.d, self.o(lay))
+        raw = struct.unpack_from('<%dH' % (w * h), self.d, self.o(blocks))
+        goals = {p for p in goals if 0 <= p[0] < w and 0 <= p[1] < h}
+        if not goals or not (0 <= start[0] < w and 0 <= start[1] < h):
+            return None
+        for strict in (True, False):
+            prev, q = {start: None}, deque([start])
+            while q:
+                p = q.popleft()
+                if p in goals:
+                    out = []
+                    while p is not None:
+                        out.append(p)
+                        p = prev[p]
+                    return out[::-1]
+                ep = raw[p[1] * w + p[0]] >> 12
+                for nx, ny in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)):
+                    if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in prev:
+                        continue
+                    v = raw[ny * w + nx]
+                    if (nx, ny) not in goals:
+                        if v >> 10 & 3:
+                            continue
+                        e = v >> 12
+                        if strict and e != ep and e not in (0, 15) and ep not in (0, 15):
+                            continue
+                    prev[(nx, ny)] = p
+                    q.append((nx, ny))
+        return None
 
     def landing_tile(self, g, n, kind):
         """Ô đáp khi bay tới map để săn: ô gặp kiểu `kind` ('land' = cỏ; 'water' = ô đi được sát nước), đi được
