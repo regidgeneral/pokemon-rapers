@@ -151,3 +151,9 @@
   loang, ô kích hoạt đòi vật phẩm chưa có = tường (gate_block, q_have), walk_path cũng tránh. Kết quả không Go-Goggles: Route 112 ->
   Fiery Path -> Route 112 (bắc) -> Route 111 (trên sa mạc) -> Route 113 -> Fallarbor -> Route 114 -> Meteor Falls (0,34 giây);
   có Go-Goggles: qua sa mạc. t_quest_fake 35/35 (thêm ca đúng ảnh), mọi bài thử qua.
+
+## 2026-11-11 — lỗi "offset out of range" khi chỉ đường
+- tick_error.log 17:27:35 (1 lần): quest_render -> guide_route -> route_from_here -> gate_block -> item_gates -> map_info -> header:
+  struct.error offset -134217716. Mã map hiện tại đọc lúc game dời SaveBlock (chuyển cảnh, đã thấy từ 09/11 ở FR) là rác -> con trỏ
+  nhóm map rác. Sửa (commit 8535416): route_from_here bỏ qua map không có trong Story.maps() (nhịp sau đọc lại đúng), cửa tới map lạ
+  cũng bỏ. t_quest_fake 36/36.
