@@ -1,0 +1,1 @@
+mGBA dev build 2026-11-06 (9178-662dada8b), tai tu https://mgba.io/downloads.html (Development downloads). Giay phep: LICENSE.txt (MPL-2.0). config.ini.mau = cai dat mau (phim, am luong) tu may nha; Choi.bat chep sang config.ini neu may chua co.

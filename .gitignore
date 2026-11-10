@@ -1,0 +1,19 @@
+# ROM / save / backup (lớn, dữ liệu người chơi)
+*.gba
+*.sav
+*.sav.*
+*.rar
+# dữ liệu tool tự sinh
+__pycache__/
+tool/ipc/
+tool/sprites/
+tool/*.log
+tool/battle_log.jsonl
+tool/shiny_count.json
+tool/settings.json
+tool/encounter_history.jsonl
+save_sync/
+save_backup/
+mgba/config.ini
+mgba/qt.ini
+mgba/*.sqlite3
