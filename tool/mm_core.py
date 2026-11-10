@@ -365,6 +365,10 @@ EMERALD = Profile(
     # Menu Start (dò 11/11 trong RAM thật: dãy mục 0,1,2,4,5,6,7 khi chưa có PokéNav; ROM tham chiếu 2/5/3 lần):
     # con trỏ u8, số mục u8, mã hành động u8[9] (POKéDEX 0, POKéMON 1, Túi 2, PokéNav 3, tên 4, LƯU 5, tuỳ chọn 6, thoát 7)
     start_menu=dict(cursor=0x0203760E, count=0x0203760F, actions=0x02037610, save=5),
+    # Câu hỏi đặt biệt danh sau khi bắt (dò 11/11): gBattlescriptCurrInstr 0x02024214 (ROM tham chiếu 526 lần) chỉ vào lệnh
+    # 0xF3 trygivecaughtmonnick (bảng lệnh 0x0831BD10, 249 lệnh; hàm 0x08056BEC đọc gMain + gBattleCommunication, về
+    # BattleMainCB2), gBattleCommunication[0] 0x02024332 = 1 là đang chờ YES/NO (theo pokeemerald). Bấm B = NO.
+    nickname=dict(curr_instr=0x02024214, comm=0x02024332, opcode=0xF3, wait_state=1),
     ball_pocket=1, master_ball=1, ultra_ball=2,
     registered_off=0x496,                                      # món đăng ký nút SELECT: u16 SaveBlock1 + 0x496
     sprite_front=0x08301418,                                   # {ptr LZ77, u16 size, u16 tag} theo loài
@@ -1371,6 +1375,16 @@ class Game:
         if mx:
             self.b.write(self.p.battle_mons + 0x28, struct.pack('<H', mx))
         return mx
+
+    def nickname_prompt(self):
+        """Game đang hỏi "Give a nickname to X?" sau khi bắt và chờ YES/NO (xem ghi chú `nickname` trong hồ sơ)?"""
+        nk = getattr(self.p, 'nickname', None)
+        if not nk:
+            return False
+        ptr, st = self.b.read_many([(nk['curr_instr'], 4), (nk['comm'], 1)])
+        ptr = struct.unpack('<I', ptr)[0]
+        return (ROM_BASE <= ptr < ROM_BASE + len(self.rom.d) and self.rom.d[ptr - ROM_BASE] == nk['opcode']
+                and st[0] == nk['wait_state'])
 
     STATUS_NAMES = ((0x7, 'ngủ'), (0x8, 'độc'), (0x10, 'bỏng'), (0x20, 'đóng băng'), (0x40, 'tê liệt'), (0x80, 'độc nặng'))
 

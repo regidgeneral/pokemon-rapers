@@ -79,3 +79,10 @@
 - Đọc thật trước khi ghi: ctl 0x08057589 (chọn lệnh), TREECKO HP 42/45 khớp ảnh, status1 (+0x4C) = 0x2, status2 = 0.
 - Code: Game.cure_battle_status (chỉ khi ctl = chọn lệnh, write_cas status1 -> 0, trận đôi thêm ô 2), tick_battle gọi khi bật Tự hồi,
   báo "💊 Trong trận: X hết ngủ". Chạy thật 1 lần: [('TREECKO', 'ngủ')], status1 sau = 0. Bài thử t_status_fake 7/7, bài cũ qua hết.
+
+## 2026-11-11 — bắt xong không đặt biệt danh
+- Duy: "làm thêm chức năng tắt đặt tên pokemon sau khi bắt". Săn đã tự bấm B; giờ cho mọi lần bắt, công tắc ⚙ (mặc định bật).
+- Dò: bảng lệnh battle script 0x0831BD10 (249 lệnh 0x00-0xF8, 5 tham chiếu). Hàm lệnh 0xF3 0x08056BEC dùng gBattleCommunication
+  0x02024332 + gMain + BattleMainCB2 0x08038421 = trygivecaughtmonnick. Vùng battle script chỉ có 1 chỗ 0xF3: 0x082DBDAF.
+  gBattlescriptCurrInstr 0x02024214 (526 tham chiếu). Bước chờ YES/NO = gBattleCommunication[0] == 1 theo pokeemerald, CHƯA đo thật.
+- Code: hồ sơ `nickname`, Game.nickname_prompt, tick_battle bấm B (game tự dọn khung). Bài thử t_status_fake 14/14, bài cũ qua hết.

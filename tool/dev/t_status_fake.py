@@ -54,6 +54,32 @@ app.auto_heal.set(True)
 app.tick_battle()
 check('bật Tự hồi: tick_battle xoá + báo', st1() == 0 and 'tê liệt' in app.status.cget('text'))
 
+# câu hỏi đặt biệt danh sau khi bắt (Duy 11/11): tự bấm B = NO
+nk = p.nickname
+SCRIPT_F3 = 0x082DBDAF                                   # chỗ duy nhất có lệnh 0xF3 trong vùng battle script
+pressed = []
+g.press = lambda seq: pressed.append([k for k, _ in seq if k])
+g.keys_left = lambda: 0
+
+
+def nick(ptr, state, on=True):
+    pressed.clear()
+    battle(0)
+    b.write(nk['curr_instr'], struct.pack('<I', ptr))
+    b.write(nk['comm'], bytes([state]))
+    app.skip_nick.set(on)
+    app.tick_battle()
+    return pressed
+
+
+check('ROM: lệnh ở 0x082DBDAF là 0xF3', app.rom.d[SCRIPT_F3 - ROM_BASE] == 0xF3)
+check('đang chờ YES/NO đặt tên -> bấm B', nick(SCRIPT_F3, 1) == [['B']])
+check('tắt công tắc -> không bấm', nick(SCRIPT_F3, 1, on=False) == [])
+check('lệnh 0xF3 nhưng chưa tới bước chờ (0) -> không bấm', nick(SCRIPT_F3, 0) == [])
+check('đã vào màn đặt tên / xong (2, 4) -> không bấm', nick(SCRIPT_F3, 2) == [] and nick(SCRIPT_F3, 4) == [])
+check('lệnh khác (chờ = 1) -> không bấm', nick(SCRIPT_F3 + 5, 1) == [] or app.rom.d[SCRIPT_F3 + 5 - ROM_BASE] == 0xF3)
+check('con trỏ rác (RAM) -> không bấm', nick(0x02000000, 1) == [])
+
 print('\n%d đúng, %d sai' % (ok, fail))
 app.destroy()
 sys.exit(1 if fail else 0)

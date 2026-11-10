@@ -377,6 +377,7 @@ class App(tk.Tk):
         except (OSError, ValueError):
             self.settings = {}
         self.auto_heal = tk.BooleanVar(value=bool(self.settings.get('auto_heal', True)))
+        self.skip_nick = tk.BooleanVar(value=bool(self.settings.get('skip_nick', True)))   # Duy 11/11: bắt xong tự chọn NO
         self.box_exp = tk.BooleanVar(value=bool(self.settings.get('box_exp', True)))
         self.shiny_boost = tk.BooleanVar(value=bool(self.settings.get('shiny_boost', True)))
         self.alert_on = tk.BooleanVar(value=bool(self.settings.get('alert', True)))   # báo shiny / nên bắt
@@ -428,6 +429,7 @@ class App(tk.Tk):
         save = self.save_area_state
         m.add_checkbutton(label='Tự hồi phục cả đội sau mỗi trận + xoá trạng thái xấu trong trận', variable=self.auto_heal,
                           command=save)
+        m.add_checkbutton(label='Bắt xong không đặt biệt danh (tự chọn NO)', variable=self.skip_nick, command=save)
         m.add_separator()
         m.add_checkbutton(label='Báo khi gặp shiny / nên bắt (kêu + khung nổi, không lấy phím của mGBA)',
                           variable=self.alert_on, command=save)
@@ -1018,7 +1020,7 @@ class App(tk.Tk):
         try:
             with open(self.settings_file, 'w', encoding='utf-8') as fp:
                 json.dump({'hide_caught': self.hide_caught.get(), 'wild_zone': self.q_wild_on.get(),
-                           'auto_heal': self.auto_heal.get(), 'box_exp': self.box_exp.get(),
+                           'auto_heal': self.auto_heal.get(), 'skip_nick': self.skip_nick.get(), 'box_exp': self.box_exp.get(),
                            'shiny_boost': self.shiny_boost.get(), 'alert': self.alert_on.get(),
                            'roam_auto': self.roam_auto.get(), 'roam_timer': round(self.roam_timer),
                            'roam_spawned': self.roam_spawned, 'fly_origin': self.fly_origin, 'fly_landed': self.fly_landed,
@@ -1434,6 +1436,12 @@ class App(tk.Tk):
                 cured = self.game.cure_battle_status()
                 if cured:
                     self.say('💊 Trong trận: ' + ' · '.join('%s hết %s' % c for c in cured))
+            if self.skip_nick.get() and self.game.nickname_prompt():   # Duy 11/11: bắt xong không đặt biệt danh
+                try:
+                    if self.game.keys_left() == 0:
+                        self.game.press([('B', 3), (None, 20)])        # B = NO, game tự dọn khung YES/NO
+                except (BridgeError, AttributeError):            # Lua cũ / bộ nhớ giả (không có _send): bạn tự chọn
+                    pass
             return
         if self.exp_snap:                                        # cờ trong trận tắt = EXP đã chia xong, không chờ overworld
             self.finish_exp()
