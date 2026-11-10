@@ -355,7 +355,9 @@ EMERALD = Profile(
     # Đo trong game 11/11 (dev\watch_fish_em.py, Duy câu tay 2 trận): callback2 trong trận / túi trong trận,
     # gBattlerControllerFuncs[0] lúc chờ chọn lệnh / chọn chiêu. gBagPosition: {cb, u8 location, u8 ngăn, u16,
     # u16 con trỏ[5] +8, u16 cuộn[5] +0x12} (đọc thật: location 1 = trận, ngăn 1 = Poké Ball).
-    cb2_battle=0x08038421, cb2_bag=0x081AAD5D, ctl_action=0x080597B5, ctl_move=0x08058B41, bag_state=0x0203CE58,
+    # ctl_action sửa 11/11: 0x080597B5 là hàm chờ chữ chạy xong (đứng lúc "Wild X appeared!"), menu chọn lệnh thật đứng
+    # ở 0x08057589 (đọc gMain, gọi từ 0x0805C040; đọc lúc Duy đứng ở menu: 11 lần liền đều 0x08057589).
+    cb2_battle=0x08038421, cb2_bag=0x081AAD5D, ctl_action=0x08057589, ctl_move=0x08058B41, bag_state=0x0203CE58,
     # Câu cá: Task_Fishing 0x0808C8C1 chạy bảng 16 bước 0x0849755C (data[0] = bước). Emerald: 4 = dấu chấm (bấm A = hỏng),
     # 6 "Oh! A bite!" -> 7 chờ A (~0,5 giây, trễ = cá chạy), 8 có thể quay lại 3 thêm vòng chấm, 9-10 "on the hook!" chờ A,
     # 11-15 hỏng / cất cần. Đo thật: 2 -> 4 -> 7 -> 10 -> A -> vào trận.

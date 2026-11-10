@@ -44,3 +44,9 @@
 - Code: hồ sơ thêm cb2_battle/ctl_*/cb2_bag/bag_state/fishing; set_bag_cursor/bag_cursor theo bố cục Emerald (mở ngăn Poké Ball ở đầu,
   bấm xuống tới đúng bóng); câu bấm A ở bước 6-7 (6 khung chờ) và ≥ 9; tắt tự lưu (START_MENU_CURSOR = None) -> nhắc lưu tay.
 - Bài thử: t_fish_fake 19/19 (thêm bước 3, 6, 7, 8), t_frmon 520, box 10, race 4, gui 0 lỗi. CHƯA chạy Săn thật.
+
+## 2026-11-11 — chạy Săn câu cá thật lần đầu
+- Duy: câu ~5 lần dính 1, vào trận với MAGIKARP Lv10 thì tool đứng ở menu FIGHT/BAG/POKéMON/RUN.
+- Đọc lúc đứng ở menu: cb2 0x08038421, inBattle 2, controller[0] = 0x08057589 (11/11 lần). 0x08057589 đọc gMain (literal 0x030022C0),
+  được gọi từ 0x0805C040. 0x080597B5 (lấy nhầm làm ctl_action) gọi từ 0x0805BFDC, đứng lúc chữ intro trận chờ A -> hàm chờ chữ.
+  Sửa ctl_action = 0x08057589. Tỉ lệ dính 1/5: chưa rõ là "Not even a nibble" (game, 50% mỗi vòng) hay "got away" (A trễ) -> hỏi Duy.
