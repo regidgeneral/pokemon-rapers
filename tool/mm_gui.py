@@ -2637,6 +2637,14 @@ class App(tk.Tk):
         self.hunt = dict(map=gn, kind=kind, a=pos, b=None, bad=set(), last=None, stuck=0, n=0, steps=0,
                          foe=None, runs=0, lock_t=None, catch=None)
         if kind == 'fish':
+            try:
+                g.set_auto_fish(True)                         # Lua bấm A lúc cá cắn (kịp cả khi fast forward)
+            except BridgeError as e:
+                self.hunt = None
+                if 'ERR' in str(e):
+                    return self.hunt_refused('mm_bridge.lua đang chạy là bản cũ, chưa tự bấm A khi cá cắn được: trong '
+                                             'mGBA mở Tools > Scripting > File > Load script, chọn lại tool\\mm_bridge.lua.')
+                raise
             self.hunt.update(rod=rod, face=face, reg0=g.registered_item(), fish_t=None, fish_st=None)
             g.set_registered_item(rod)                        # SELECT = quăng cần; dừng săn thì trả lại món cũ
         elif not self.hunt_pick_b(pos):
@@ -2690,6 +2698,10 @@ class App(tk.Tk):
     def hunt_stop(self, msg, ok=True):
         h, self.hunt = self.hunt, None
         if h and h.get('kind') == 'fish':                     # trả lại món đăng ký SELECT của bạn
+            try:
+                self.game.set_auto_fish(False)
+            except BridgeError:
+                pass
             try:
                 self.game.set_registered_item(h['reg0'])
             except BridgeError:
@@ -2841,9 +2853,9 @@ class App(tk.Tk):
         return have[-1]
 
     def hunt_fish_step(self):
-        """Một nhịp câu: không đang câu -> SELECT quăng cần; đang câu -> bấm A ngay khi cá cắn (bước trong
-        fishing['press_a'], Emerald 6-7: trễ ~0,5 giây là cá chạy) và khi có thông báo (bước >= 9);
-        không bấm lúc đang hiện dấu chấm (bấm A lúc đó là hỏng lượt)."""
+        """Một nhịp câu: không đang câu -> SELECT quăng cần; đang câu -> bấm A khi có thông báo (bước >= 9).
+        Lúc cá cắn (fishing['press_a'], Emerald 6-7, chỉ ~30 khung) thì mm_bridge.lua tự bấm (set_auto_fish), Python
+        không bấm thêm: A đến trễ rơi vào lúc đang hiện dấu chấm (vòng sau) là hỏng lượt."""
         h, g = self.hunt, self.game
         st, now = g.fishing_step(), time.time()
         if st != h['fish_st'] or now - h.get('fish_seen', 0) > 2:   # đổi bước, hoặc vừa đánh trận xong
@@ -2853,9 +2865,7 @@ class App(tk.Tk):
                                                     if st is None else 'game đứng yên ở bước câu %d quá 20 giây' % st), False)
         h['fish_seen'] = now
         if st is not None:
-            if st in self.prof.fishing['press_a']:            # "Oh! A bite!": bấm ngay, không chờ 20 khung
-                g.press([('A', 3), (None, 6)])
-            elif st >= 9:                                     # đo 11/11: "on the hook!" đứng ở bước 10 chờ A rồi mới vào trận
+            if st >= 9 and st not in self.prof.fishing['press_a']:                                     # đo 11/11: "on the hook!" đứng ở bước 10 chờ A rồi mới vào trận
                 g.press([('A', 3), (None, 20)])
             return
         if g.b.read(self.prof.fly['lock'], 1)[0]:             # chữ khác (vd cần chưa đăng ký) / sự kiện

@@ -1343,6 +1343,14 @@ class Game:
                 return struct.unpack_from('<h', raw, 40 * i + 8)[0]
         return None
 
+    def set_auto_fish(self, on):
+        """Bật/tắt lệnh A của mm_bridge.lua: Lua tự bấm A trong đúng khung hình task câu cá tới bước fishing['press_a']
+        (cá cắn chỉ chờ ~30 khung; fast forward thì Python không kịp). Lua bản cũ -> BridgeError 'ERR cmd'."""
+        if not hasattr(self.b, '_send'):                       # bộ nhớ giả: không có Lua
+            return
+        f = self.p.fishing
+        self.b._send(['A %08x %x %s' % (f['tasks'], f['task_fn'], ','.join(map(str, f['press_a']))) if on else 'A 0 0 0'])
+
     def registered_item(self):
         return struct.unpack('<H', self.b.read(self.sb1() + self.p.registered_off, 2))[0]
 

@@ -74,15 +74,11 @@ check('bắt đầu ở chế độ câu', app.hunt and app.hunt['kind'] == 'fis
 check('đã đăng ký Old Rod vào SELECT', g.registered_item() == 262)
 app.hunt_step()
 check('quăng cần bằng SELECT', pressed and pressed[-1][1] == ['SELECT'])
-for s in (0, 2, 3, 4, 4, 5, 8):
+for s in (0, 2, 3, 4, 4, 5, 6, 7, 8):
     set_task(s)
     n = len(pressed)
     app.hunt_step()
-    check('bước %d (dấu chấm / chờ): không bấm gì' % s, len(pressed) == n)
-for s in (6, 7):
-    set_task(s)
-    app.hunt_step()
-    check('bước %d ("Oh! A bite!"): bấm A ngay' % s, pressed[-1] == (s, ['A']))
+    check('bước %d (dấu chấm / cá cắn = Lua bấm): Python không bấm' % s, len(pressed) == n)
 set_task(9)
 app.hunt_step()
 check('bước 9 (on the hook): bấm A', pressed[-1] == (9, ['A']))

@@ -2,6 +2,8 @@
 -- Giao thức qua file trong thư mục IPC (không dùng socket):
 --   cmd.txt : dòng 1 = id; các dòng sau: "R <addr_hex> <len>" hoặc "W <addr_hex> <hex bytes>"
 --             "K <mask_hex> <số khung>" = xếp hàng giữ phím (mask 0 = chờ), "S 0 0" = hỏi còn bao nhiêu khung phím
+--             "A <gTasks_hex> <hàm_task_hex> <bước,bước>" = tự bấm A ngay trong khung hình task đó tới bước đã nêu
+--             (câu cá: "Oh! A bite!" chỉ chờ ~30 khung, fast forward thì Python không kịp); "A 0 0 0" = tắt. Trả "1".
 --   resp.txt: dòng 1 = id; dòng 2 = OK hoặc ERR <lý do>; rồi mỗi lệnh R / S một dòng
 -- Phím GBA: A=1 B=2 Select=4 Start=8 Phải=0x10 Trái=0x20 Lên=0x40 Xuống=0x80 R=0x100 L=0x200 (cộng với phím thật).
 -- Cho đọc/ghi EWRAM (0x02000000-0x0203FFFF) và IWRAM (0x03000000-0x03007FFF); ROM (0x08000000-0x09FFFFFF) chỉ đọc.
@@ -20,6 +22,7 @@ local POLL_EVERY = 3        -- số khung hình giữa 2 lần kiểm tra file l
 local lastId = nil
 local frameCount = 0
 local keyQueue, keyCur = {}, nil     -- hàng phím: {mask, số khung}
+local autoA = nil                    -- {tasks, fn, {bước = true}, đã bấm cho lượt này?, số khung còn giữ A}
 
 local function inRange(addr, len, isWrite)
 	if len < 0 or len > 4096 then return false end
@@ -83,6 +86,18 @@ local function handle(text)
 			local n = tonumber(b)
 			if not (addr and n and n > 0 and n <= 600 and addr < 0x400) then out[2] = "ERR key " .. lines[i]; break end
 			keyQueue[#keyQueue + 1] = { addr, n }
+		elseif op == "A" then
+			local fn, steps = lines[i]:match("^A%s+%x+%s+(%x+)%s+(%S+)")
+			if not addr or addr == 0 then
+				if autoA and autoA.hold > 0 then emu:clearKeys(1) end
+				autoA = nil
+			else
+				if not (inRange(addr, 16 * 40) and fn and steps) then out[2] = "ERR auto " .. lines[i]; break end
+				local set = {}
+				for s in steps:gmatch("%d+") do set[tonumber(s)] = true end
+				autoA = { tasks = addr, fn = tonumber(fn, 16), steps = set, done = false, hold = 0 }
+			end
+			out[#out + 1] = "1"
 		elseif op == "S" then
 			local left = keyCur and keyCur[2] or 0
 			for _, k in ipairs(keyQueue) do left = left + k[2] end
@@ -108,8 +123,32 @@ local function keyTick()             -- chạy mỗi khung hình: giữ phím đ
 	end
 end
 
+local function autoTick()           -- mỗi khung hình: task câu cá tới bước chờ A -> bấm A 2 khung, một lần mỗi lượt
+	if not autoA then return end
+	if autoA.hold > 0 then
+		autoA.hold = autoA.hold - 1
+		if autoA.hold == 0 then emu:clearKeys(1) end
+		return
+	end
+	local inStep = false
+	for i = 0, 15 do
+		local t = autoA.tasks + 40 * i
+		if emu:read8(t + 4) ~= 0 and emu:read32(t) == autoA.fn and autoA.steps[emu:read16(t + 8)] then
+			inStep = true
+			break
+		end
+	end
+	if not inStep then
+		autoA.done = false           -- rời bước chờ: lượt sau (vòng chấm mới / lần câu mới) được bấm lại
+	elseif not autoA.done then
+		emu:addKeys(1)
+		autoA.hold, autoA.done = 2, true
+	end
+end
+
 local function poll()
 	keyTick()
+	autoTick()
 	frameCount = frameCount + 1
 	if frameCount % POLL_EVERY ~= 0 then return end
 	local f = io.open(IPC .. "cmd.txt", "rb")
