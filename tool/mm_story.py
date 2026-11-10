@@ -248,7 +248,8 @@ class Story:
         seen = set()
         for c in info['connections']:
             seen.add(c['to'])
-            add('Đi tiếp', None, None, 'Hướng %s → %s' % (c['dir'], R.map_name(*c['to'])),
+            add('Đi tiếp', None, None, '%s → %s' % ('Dive (%s)' % c['dir'] if c['dir'] in ('lặn xuống', 'nổi lên')
+                                                     else 'Ra khỏi map', R.map_name(*c['to'])),   # Duy 11/11: không nói hướng
                 detail='Nối trực tiếp (đi bộ qua mép map).', to=c['to'])
         for w in info['warps']:
             if w['to'] in seen or w['to'][0] >= 200:
@@ -459,7 +460,7 @@ class Story:
                 todo.append(dict(text='Sự kiện khi bước vào %s: %s (có thể đã xảy ra rồi)' % (pos(r), t), rows=[r], done=None))
         for r in rows:
             if r['sec'] == 'Đi tiếp' and not r.get('dark'):
-                t = r['title'].replace('Hướng ', 'Đi về phía ').replace('Cửa → ', 'Cửa (%s) → ' % pos(r) if r['x'] is not None else 'Cửa → ')
+                t = r['title'].replace('Cửa → ', 'Cửa (%s) → ' % pos(r) if r['x'] is not None else 'Cửa → ')
                 ways.append(dict(text=t, rows=[r] if r['x'] is not None else [], done=None, to=r['to']))
         groups = {}
         for r in rows:
@@ -607,10 +608,30 @@ class Story:
             self._scripts[key] = out
         return self._scripts[key]
 
-    def walk_path(self, g, n, start, goals):
+    def flag_setters(self, flag):
+        """[(map, kiểu 'npc'/'trigger'/'sign'/'map', x, y)] mọi chỗ script bật cờ `flag` (Duy 11/11: NPC chắn đường chỉ đi
+        khi cờ ẩn của nó bật — vd hàng lính Aqua trước bảo tàng Slateport đi khi nói chuyện với Dock ở xưởng tàu).
+        Quét mọi map một lần rồi giữ lại."""
+        idx = self._scripts.get('setters')
+        if idx is None:
+            idx = {}
+            for g, n in self.maps():
+                try:
+                    info = self.map_info(g, n)
+                except Exception:
+                    continue
+                for kind, key in (('npc', 'npcs'), ('trigger', 'triggers'), ('sign', 'signs'), ('map', 'map_scripts')):
+                    for e in info[key]:
+                        for f in e.get('facts') or []:
+                            if f[0] == 'set_flag':
+                                idx.setdefault(f[1], []).append(((g, n), kind, e.get('x'), e.get('y')))
+            self._scripts['setters'] = idx
+        return idx.get(flag, [])
+
+    def walk_path(self, g, n, start, goals, blocked=()):
         """[(x, y)...] đường ngắn nhất từ start tới một ô trong goals trên lưới va chạm của map (Duy 11/11: vẽ đường tới
         nhiệm vụ). Ô đi được = va chạm (bit 10-11) = 0; đổi độ cao (bit 12-15) chỉ qua ô độ cao 0/15 như game (đất <-> nước
-        cần Surf). Ô đích luôn vào được (cửa, NPC). Không tính NPC đứng chắn, gờ nhảy một chiều.
+        cần Surf). Ô đích luôn vào được (cửa, NPC). blocked = ô có NPC đứng (không đi qua). Không tính gờ nhảy một chiều.
         Theo độ cao không có đường -> thử bỏ độ cao; vẫn không -> None."""
         from collections import deque
         lay = self.u32(self.header(g, n))
@@ -635,7 +656,7 @@ class Story:
                         continue
                     v = raw[ny * w + nx]
                     if (nx, ny) not in goals:
-                        if v >> 10 & 3:
+                        if v >> 10 & 3 or (nx, ny) in blocked:
                             continue
                         e = v >> 12
                         if strict and e != ep and e not in (0, 15) and ep not in (0, 15):

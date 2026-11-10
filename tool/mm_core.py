@@ -1339,6 +1339,19 @@ class Game:
             return struct.unpack_from('<H', raw, 2 * i)[0] if 0 <= i < 0x100 else None
         return get
 
+    def live_objects(self):
+        """[(localId, x, y)] NPC đang hiện trên map hiện tại (gObjectEvents 16 x 0x24: bit 0 = đang dùng, +8 localId,
+        +9 số map, +0xA nhóm, +0x10 toạ độ + 7). Bỏ nhân vật (ô 0)."""
+        raw = self.b.read(self.p.player_obj, 0x24 * 16)
+        g, n = self.current_map()
+        out = []
+        for i in range(1, 16):
+            e = raw[0x24 * i:0x24 * i + 0x24]
+            if e[0] & 1 and e[0xA] == g and e[9] == n:
+                x, y = struct.unpack_from('<hh', e, 0x10)
+                out.append((e[8], x - 7, y - 7))
+        return out
+
     def player_xy(self):
         """Ô người chơi đang đứng trên map (toạ độ object trừ lề 7 ô)."""
         x, y = struct.unpack('<hh', self.b.read(self.p.player_obj + 0x10, 4))

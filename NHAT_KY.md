@@ -108,3 +108,12 @@
   -> cầu thang 1F (6,1) -> Stern 2F; xem ảnh vẽ thử đúng.
 - Bài thử t_quest_fake 18/18 (dữ liệu, bước hiện tại, giao diện giả ở Slateport). t_fish_fake hỏng vì settings.json thật đang săn
   ABRA (hộp thoại giả trả "Không") -> bài thử tự bỏ hunt_target. Mọi bài thử qua.
+
+## 2026-11-11 — NPC chắn cửa bảo tàng: thiếu bước Dock + tự phát hiện NPC chắn đường
+- Duy gửi ảnh: đường tím tới cửa bảo tàng nhưng hàng lính Aqua chắn. RAM: lính ở (30,27) (31,27) ngay trước cửa (30,26) (31,26),
+  Duy ở (31,28). Cờ ẩn chung 0x372 FLAG_HIDE_SLATEPORT_CITY_TEAM_AQUA, chỉ bật ở SlateportCity_SternsShipyard_1F/scripts.inc:15-16
+  (nói chuyện với Dock ô 5,5, FLAG_DOCK_REJECTED_DEVON_GOODS 0x94). Lính 1 chỉ nói "Quit pushing" rồi đứng lại.
+- Sửa: thêm bước Dock vào gen_quest (42 bước), RAM thật ra bước 12 = Dock. Chung cho mọi chỗ: Game.live_objects (gObjectEvents,
+  lọc map), Story.flag_setters (quét mọi script 1 lần 0,4 giây: tự tìm ra cờ 0x372 <- NPC (5,5) map (9,0)), walk_path(blocked=...),
+  App.quest_route_now / quest_block_text (⚠ CÓ NPC ĐỨNG CHẮN ĐƯỜNG + [xem chỗ đó]) / ✖ đỏ. Bấm xem bước khác cũng có ★ (q_view_step).
+  Mục LỐI ĐI: "Hướng/Đi về phía Bắc" -> "Ra khỏi map / Dive". t_quest_fake 22/22 (thêm ca đúng ảnh), bài cũ qua hết.

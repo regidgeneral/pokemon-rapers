@@ -36,6 +36,9 @@ STEPS = [
     dict(map=(0, 11), xy=(12, 9), who='ông Briney', done=('f', 0x877),  # FLAG_VISITED_SLATEPORT_CITY
          do='Nhờ ông Briney chở tới Slateport.',
          need='', src='DewfordTown/scripts.inc:165'),
+    dict(map=(9, 0), xy=(5, 5), who='Dock (thợ đóng tàu)', done=('f', 0x094),  # FLAG_DOCK_REJECTED_DEVON_GOODS
+         do='Vào xưởng tàu của Captain Stern, nói chuyện với Dock: biết Stern đang ở bảo tàng; hàng lính Team Aqua chắn cửa bảo tàng rút đi.',
+         need='Devon Goods trong túi.', src='SlateportCity_SternsShipyard_1F/scripts.inc:15-16 (cũng bật FLAG_HIDE_SLATEPORT_CITY_TEAM_AQUA)'),
     dict(map=(9, 8), xy=(13, 6), who='Captain Stern', done=('f', 0x095),  # FLAG_DELIVERED_DEVON_GOODS
          do='Giao Devon Goods cho Captain Stern; đánh 2 lính Team Aqua xông vào.',
          need='Devon Goods trong túi.', src='SlateportCity_OceanicMuseum_2F/scripts.inc:72'),

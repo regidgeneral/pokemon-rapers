@@ -3102,14 +3102,84 @@ class App(tk.Tk):
         return {'Bắc': {(x, 0) for x in range(w)}, 'Nam': {(x, h - 1) for x in range(w)},
                 'Tây': {(0, y) for y in range(h)}, 'Đông': {(w - 1, y) for y in range(h)}}.get(edge, set())
 
+    def quest_route_now(self, xy=None):
+        """(đường từng ô, [NPC chắn]) từ nhân vật tới đích trên map đang đứng. Tránh ô có NPC đứng; không vòng được thì
+        đi xuyên và trả về NPC chắn: [(ô, npc trong ROM hoặc None, [nơi bật cờ ẩn NPC đó])] (Duy 11/11)."""
+        xy = xy or self.q_player
+        if self.q_shown != self.q_cur or not xy:
+            return None, []
+        tiles = self.guide_tiles(self.q_shown)
+        if not tiles:
+            return None, []
+        try:
+            objs = self.game.live_objects()
+        except BridgeError:
+            objs = []
+        key = (self.q_shown, xy, tuple(sorted(tiles)), tuple(objs))
+        if getattr(self, '_q_route_key', None) == key:
+            return self._q_route_val
+        st = self.story
+        busy = {(x, y) for _, x, y in objs} - tiles
+        path = st.walk_path(*self.q_shown, xy, tiles, blocked=busy)
+        blockers = []
+        if not path:
+            path = st.walk_path(*self.q_shown, xy, tiles)
+            npcs = {e['id']: e for e in st.map_info(*self.q_shown)['npcs']}
+            on = set(path or ())
+            for lid, x, y in objs:
+                if (x, y) in on:
+                    e = npcs.get(lid)
+                    blockers.append(((x, y), e, st.flag_setters(e['flag']) if e and e['flag'] else []))
+        self._q_route_key, self._q_route_val = key, (path, blockers)
+        return path, blockers
+
+    def quest_block_text(self, T):
+        """⚠ NPC chắn đường + việc làm nó rời đi (theo script bật cờ ẩn của nó)."""
+        try:
+            xy = self.q_player or (self.game.player_xy() if self.q_shown == self.q_cur else None)
+        except BridgeError:
+            return
+        _, blockers = self.quest_route_now(xy)
+        if not blockers:
+            return
+        T.insert('end', '⚠ CÓ NPC ĐỨNG CHẮN ĐƯỜNG (dấu ✖ đỏ trên bản đồ)\n', 'head')
+        seen = set()
+        for (x, y), e, setters in blockers:
+            key = e['flag'] if e else (x, y)
+            if key in seen:
+                continue
+            seen.add(key)
+            if not setters:
+                T.insert('end', '• NPC ở ô %d,%d: script không có việc nào làm nó rời đi — thử nói chuyện với nó, hoặc làm tiếp '
+                                'bước cốt truyện khác rồi quay lại.\n' % (x, y), 'route')
+                continue
+            for i, (m, kind, sx, sy) in enumerate(setters[:3]):
+                how = {'npc': 'nói chuyện với NPC ở ô %s,%s' % (sx, sy), 'trigger': 'bước vào ô %s,%s' % (sx, sy),
+                       'sign': 'xem bảng/vật ở ô %s,%s' % (sx, sy), 'map': 'đi vào map này'}[kind]
+                tag = 'blk%d_%d' % (key if isinstance(key, int) else 0, i)
+                T.insert('end', '• Nhóm NPC này chỉ rời đi khi bạn: %s — %s  ' % (how, self.route_name(m)), 'route_now')
+                T.insert('end', '[xem chỗ đó]\n', ('route_x', tag))
+                T.tag_bind(tag, '<Button-1>', lambda ev, m=m, sx=sx, sy=sy: self.guard(self.quest_show_spot)(m, sx, sy))
+        T.insert('end', '\n')
+
+    def quest_show_spot(self, m, x, y):
+        self.q_nb.select(0)
+        self.quest_open(m)
+        if x is not None:
+            self.quest_cam_pause()
+            self.quest_see(x, y)
+            k = self.q_scale * 16
+            self.q_cv.create_oval(x * k - 8, y * k - 8, x * k + k + 8, y * k + k + 8, outline='#ffd600', width=4, tags='sel')
+
     def quest_path_draw(self):
-        """Đường tím từng ô từ nhân vật tới cửa / mép map của chặng kế, hoặc tới NPC nhiệm vụ (map đang đứng)."""
+        """Đường tím từng ô từ nhân vật tới cửa / mép map của chặng kế, hoặc tới NPC nhiệm vụ (map đang đứng);
+        NPC chắn đường đánh dấu ✖ đỏ."""
         cv, k = self.q_cv, self.q_scale * 16
         cv.delete('qpath')
-        if self.q_shown != self.q_cur or not self.q_player:
-            return
-        tiles = self.guide_tiles(self.q_shown)
-        path = self.story.walk_path(*self.q_shown, self.q_player, tiles) if tiles else None
+        path, blockers = self.quest_route_now()
+        for (x, y), _, _ in blockers:
+            cv.create_line(x * k + 3, y * k + 3, x * k + k - 3, y * k + k - 3, fill='red', width=4, tags=('qpath', 'qblk'))
+            cv.create_line(x * k + k - 3, y * k + 3, x * k + 3, y * k + k - 3, fill='red', width=4, tags=('qpath', 'qblk'))
         if not path or len(path) < 2:
             return
         pts = [c for x, y in path for c in (x * k + k // 2, y * k + k // 2)]
@@ -3117,6 +3187,7 @@ class App(tk.Tk):
         cv.create_line(*pts, fill='white', width=wd + 4, capstyle='round', joinstyle='round', tags='qpath')
         cv.create_line(*pts, fill='#d500f9', width=wd, capstyle='round', joinstyle='round', arrow='last',
                        arrowshape=(wd * 3, wd * 3, wd * 1.5), tags='qpath')
+        cv.tag_raise('qblk')
         cv.tag_raise('player')
 
     def quest_target_draw(self):
@@ -3125,9 +3196,12 @@ class App(tk.Tk):
         cv.delete('qtarget')
         g, s = self.guide_goal(), getattr(self, 'q_step', None)
         if not g or not g[1]:
-            return
+            g = (None, None, '')
         spot, label = None, None
-        if self.q_shown == g[0]:
+        v = getattr(self, 'q_view_step', None)                # bước đang bấm xem ở tab Cốt truyện (khác bước hiện tại)
+        if v and self.q_shown == v['map'] and v is not s:
+            spot, label = v['xy'], '★ ' + v['who']
+        elif self.q_shown == g[0]:
             spot, label = g[1], '★ NHIỆM VỤ: ' + g[2]
         elif s and s.get('via') and self.q_shown == s['via'][0]:
             spot, label = s['via'][1], '★ đi tiếp từ đây'
@@ -4194,7 +4268,8 @@ class App(tk.Tk):
         return '%s%s — %s' % (nm, ' (trong nhà / tầng khác)' if inner else '', s['who'])
 
     def quest_show_step(self, s):
-        """Mở map của bước và đưa khung nhìn tới ô nhiệm vụ."""
+        """Mở map của bước và đưa khung nhìn tới ô nhiệm vụ (★ vẽ cả khi không phải bước hiện tại)."""
+        self.q_view_step = s
         self.q_nb.select(0)
         self.quest_open(s['map'])
         self.quest_cam_pause()
@@ -4220,6 +4295,7 @@ class App(tk.Tk):
         if not self.q_guide.get():
             T.insert('end', 'Dẫn đường nhiệm vụ đang tắt (⚙ Cài đặt).\n', 'hint')
         T.insert('end', '\n')
+        self.quest_block_text(T)
 
     def quest_story(self, flag=None, have=None):
         """Tab con 📖 Cốt truyện: mọi bước theo thứ tự (✔ xong, ➜ đang làm); bấm dòng = mở map + chỗ nhiệm vụ."""

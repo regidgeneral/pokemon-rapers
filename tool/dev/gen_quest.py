@@ -38,6 +38,7 @@ S = [
  ('DewfordTown_Gym', (4, 3), 'Brawly', ('FLAG_DEFEATED_DEWFORD_GYM',), 'Huy hiệu 2: đánh Brawly.', 'Gym hệ Giác đấu; gym tối, có HM05 Flash thì dễ hơn.', 'DewfordTown_Gym/scripts.inc:150'),
  ('GraniteCave_StevensRoom', (7, 8), 'Steven', ('FLAG_DELIVERED_STEVEN_LETTER',), 'Đưa thư cho Steven ở cuối hang Granite.', 'Thư của chủ tịch Devon.', 'GraniteCave_StevensRoom/scripts.inc:10'),
  ('DewfordTown', (12, 9), 'ông Briney', ('FLAG_VISITED_SLATEPORT_CITY',), 'Nhờ ông Briney chở tới Slateport.', '', 'DewfordTown/scripts.inc:165'),
+ ('SlateportCity_SternsShipyard_1F', (5, 5), 'Dock (thợ đóng tàu)', ('FLAG_DOCK_REJECTED_DEVON_GOODS',), 'Vào xưởng tàu của Captain Stern, nói chuyện với Dock: biết Stern đang ở bảo tàng; hàng lính Team Aqua chắn cửa bảo tàng rút đi.', 'Devon Goods trong túi.', 'SlateportCity_SternsShipyard_1F/scripts.inc:15-16 (cũng bật FLAG_HIDE_SLATEPORT_CITY_TEAM_AQUA)'),
  ('SlateportCity_OceanicMuseum_2F', (13, 6), 'Captain Stern', ('FLAG_DELIVERED_DEVON_GOODS',), 'Giao Devon Goods cho Captain Stern; đánh 2 lính Team Aqua xông vào.', 'Devon Goods trong túi.', 'SlateportCity_OceanicMuseum_2F/scripts.inc:72'),
  ('Route110', (34, 56), 'rival', ('VAR_ROUTE110_STATE', 1), 'Rival đón đánh trên Route 110.', '', 'Route110/scripts.inc:470'),
  ('MauvilleCity', (8, 6), 'Wally', ('FLAG_DEFEATED_WALLY_MAUVILLE',), 'Wally thách đấu trước cửa gym.', '', 'MauvilleCity/scripts.inc:149'),
