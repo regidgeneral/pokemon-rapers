@@ -51,5 +51,26 @@ g.b.write(g.p.party_base + MON_SIZE, m.to_bytes())
 x = g.party()[1]
 check('sửa Charizard Lv60 shiny IV 31', x.level == 60 and x.is_shiny_pid() and x.iv == [31] * 6 and x.checksum_ok)
 print('đội:', team(), '| box 1:', box1())
+
+# 11/11: Emerald dời kho PC khi chuyển cảnh. Đọc kho -> game dời 56 byte -> ghi theo địa chỉ cũ phải bị chặn (Box 1 lệch)
+addrs, data = g.read_box()
+ptr = g.b.read_u32(g.p.storage_ptr)
+size = 4 + len(data)
+whole = g.b.read(ptr, 4) + bytes(data)
+g.b.write(ptr + 56, whole)                                   # game chép kho sang chỗ mới rồi đổi con trỏ
+g.b.write(g.p.storage_ptr, struct.pack('<I', ptr + 56))
+new = bytearray(data)
+new[0:80] = bytes(80)
+try:
+    g.write_box(addrs, data, new)
+    check('ghi kho sau khi game dời: phải từ chối', False)
+except ValueError:
+    check('ghi kho sau khi game dời: từ chối', True)
+check('kho ở chỗ mới còn nguyên', g.b.read(ptr + 56, size) == whole and box1()[0] == 'CHARMANDER')
+try:
+    g.release(0, 0)                                          # đọc lại con trỏ mới -> ghi đúng chỗ
+    check('thả sau khi dời: đúng chỗ mới', box1()[0] == '-' and box1()[1] == 'SQUIRTLE')
+except ValueError as e:
+    check('thả sau khi dời: %s' % e, False)
 print('%d đúng, %d sai' % (ok, fail))
 app.destroy()

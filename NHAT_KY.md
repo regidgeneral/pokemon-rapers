@@ -157,3 +157,19 @@
   struct.error offset -134217716. Mã map hiện tại đọc lúc game dời SaveBlock (chuyển cảnh, đã thấy từ 09/11 ở FR) là rác -> con trỏ
   nhóm map rác. Sửa (commit 8535416): route_from_here bỏ qua map không có trong Story.maps() (nhịp sau đọc lại đúng), cửa tới map lạ
   cũng bỏ. t_quest_fake 36/36.
+
+## 2026-11-11 — Box 1 hỏng: chia EXP kho ghi lệch lúc game dời kho PC
+- Duy: tool gửi vào Box 2 thay vì Box 1. Đo RAM: 30 ô Box 1 khác 0 nhưng không giải mã được (tab Kho hiện "trống", deposit cần ô toàn
+  0 -> sang Box 2); 4 byte đầu kho = 65209da6 (box đang chọn rác). Box 1 thật nằm lệch: bắt đầu ở con trỏ kho + 4 - 56.
+- Nguyên nhân: Emerald dời SaveBlock + kho PC khi chuyển cảnh. finish_exp đọc kho -> tính EXP -> write_box ghi THƯỜNG theo địa chỉ cũ
+  -> Box 1 ghi lệch 56 byte. battle_log: 17:07 (10/11) Box 1 còn nhận EXP, 17:12 chỉ còn Box 2. Save 17:17 và 04:24 đã mang Box 1 hỏng.
+- Hỏng thêm: game coi các ô lệch là con hỏng, BẬT bit lên dữ liệu con thật: byte 75 bit trong 0x07, byte 15/27/39/51 bit 0x40 ->
+  21 con sai checksum (EXP thành 1073743930...). Phần đầu Zubat (ô 1) rơi ra ngoài kho, mất khi game dời tiếp.
+- Sửa code: Game._box_cas = write_cas kèm điều kiện con trỏ kho không đổi; write_box, deposit, withdraw, release, sort_boxes đều qua
+  đó; read_box đọc con trỏ 1 lần. finish_exp: kho bị từ chối thì bỏ phần kho trận đó (báo "game vừa dời kho PC").
+  t_box_fake 13/13 (thêm ca dời kho 56 byte giữa đọc và ghi), t_exp_fake 22/22; t_gui_fake "0 bấm" có từ trước.
+- Cứu: dev\fix_box1_em.py = Box 1 từ save sạch 16:38 (save_backup\20261110-1638_box1_sach.sav, nhánh save ed39e03) + phát lại EXP từng
+  trận theo battle_log (khớp RAM mọi con còn nguyên); ô 26-30 (bắt sau 16:38) lấy từ RAM lệch, gỡ bit game bật (cách gỡ thử trên 24 con
+  có bản sạch: 24/24 đúng y). Grimer có lại SLUDGE. Ghi có điều kiện, đọc lại 30/30 checksum đúng; byte đầu kho = 0.
+  Save trước khi cứu: save_backup\20261111-truoc_cuu_box1.sav. ☐ Duy lưu game + mở lại tool bản mới.
+- FR: deposit/withdraw/... cùng kiểu ghi thường (FR cũng dời SaveBlock); FR chưa ghi kho sau trận nên ít gặp. Chưa sửa bên FR.

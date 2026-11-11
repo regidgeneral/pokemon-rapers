@@ -1550,6 +1550,7 @@ class App(tk.Tk):
                 rec['party'].append([r.species_name(m.species), lv0, lv1, gain])
                 rec['evolved'] += [['đội', r.species_name(a), r.species_name(b)] for a, b in evos]
                 evo_sp |= {b for _, b in evos}
+            box_rec, box_evo = [], []
             for i in range(0, len(box), BOX_MON_SIZE):
                 c = bytes(box[i:i + BOX_MON_SIZE])
                 if not any(c) or not 1 <= cell_species(c) <= r.max_species:
@@ -1560,11 +1561,17 @@ class App(tk.Tk):
                 gain = share_exp_gain(r, fl, m, otid, trainer, lucky)
                 lv0, lv1, evos = share_exp_apply(r, m, gain, ever)
                 box[i:i + BOX_MON_SIZE] = party_to_box(m)
-                rec['box'].append([i // BOX_MON_SIZE, r.species_name(m.species), lv0, lv1, gain])
-                rec['evolved'] += [['kho', r.species_name(a), r.species_name(b)] for a, b in evos]
-                evo_sp |= {b for _, b in evos}
+                box_rec.append([i // BOX_MON_SIZE, r.species_name(m.species), lv0, lv1, gain])
+                box_evo += evos
             if box != old:
-                g.write_box(addrs, old, box)
+                try:
+                    g.write_box(addrs, old, box)              # có điều kiện: kho vừa dời (chuyển cảnh) thì bỏ phần kho
+                except ValueError:
+                    box_rec, box_evo = [], []
+                    self.exp_msg.append('chưa chia EXP cho kho (game vừa dời kho PC)')
+            rec['box'] = box_rec
+            rec['evolved'] += [['kho', r.species_name(a), r.species_name(b)] for a, b in box_evo]
+            evo_sp |= {b for _, b in box_evo}
         if evo_sp:
             g.mark_dex(evo_sp)                                    # game cũng ghi Pokédex khi tiến hoá
         if rec['party'] or rec['box']:

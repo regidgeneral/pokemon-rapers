@@ -1157,18 +1157,30 @@ class Game:
                     self.b.write(a, bytes([self.b.read(a, 1)[0] | 1 << (n & 7)]))
 
     def read_box(self):
-        """(danh sách địa chỉ các box, bytearray toàn bộ kho PC nối liền theo thứ tự box)."""
-        addrs = [self.box_addr(i) for i in range(self.p.box_slots // BOX_CAPACITY)]
+        """(danh sách địa chỉ các box, bytearray toàn bộ kho PC nối liền theo thứ tự box). Con trỏ kho đọc MỘT lần."""
+        base = self.box_addr(0)
+        addrs = [base + i * BOX_CAPACITY * BOX_MON_SIZE for i in range(self.p.box_slots // BOX_CAPACITY)]
         size = BOX_CAPACITY * self.p.box_size
         return addrs, bytearray(b''.join(self.b.read_many([(a, size) for a in addrs])))
 
     def write_box(self, addrs, old, new):
-        """Chỉ ghi lại các box có thay đổi."""
+        """Chỉ ghi lại các box có thay đổi, có điều kiện (_box_cas): kho vừa dời/đổi thì báo lỗi, không ghi gì."""
         size = BOX_CAPACITY * self.p.box_size
-        for i, a in enumerate(addrs):
-            o = i * size
-            if new[o:o + size] != old[o:o + size]:
-                self.b.write(a, new[o:o + size])
+        items = [(a, bytes(old[i * size:(i + 1) * size]), bytes(new[i * size:(i + 1) * size]))
+                 for i, a in enumerate(addrs) if new[i * size:(i + 1) * size] != old[i * size:(i + 1) * size]]
+        if items:
+            self._box_cas(addrs[0] - 4, items)
+
+    def _box_cas(self, ptr, items, tries=5):
+        """Ghi items [(địa chỉ, byte cũ, byte mới)] chỉ khi con trỏ kho còn = ptr VÀ mọi vùng còn y byte cũ (cùng một
+        khung hình). Emerald dời SaveBlock + kho PC mỗi lần chuyển cảnh: ghi theo địa chỉ cũ = ghi lệch, hỏng cả box
+        (Box 1 lệch 56 byte, 10/11). Game giải mã tại chỗ thì đợi khung sau thử lại; kho đã dời thì báo lỗi."""
+        pb = struct.pack('<I', ptr)
+        for _ in range(tries):
+            if self.b.write_cas([(self.p.storage_ptr, pb, pb)] + items):
+                return
+            time.sleep(0.05)
+        raise ValueError('Kho PC vừa đổi chỗ trong game (chuyển cảnh?), chưa ghi gì. Thử lại.')
 
     def box_addr(self, box):
         """FireRed: gPokemonStoragePtr -> 4 byte rồi 14 box liền nhau."""
@@ -1227,8 +1239,10 @@ class Game:
             raise ValueError('Kho đã đầy.')
         box, cell = divmod(free, BOX_CAPACITY)
         data = b''.join(bytes(x.enc) for x in rest) + bytes(MON_SIZE * (PARTY_SLOTS - len(rest)))
-        self.b.write_many([(addrs[box] + cell * BOX_MON_SIZE, party_to_box(m)),
-                           (self.p.party_base, data), (self.p.party_count, bytes([len(rest)]))])
+        old_party = b''.join(bytes(x.enc) for x in party)
+        self._box_cas(addrs[0] - 4, [(addrs[box] + cell * BOX_MON_SIZE, bytes(BOX_MON_SIZE), party_to_box(m)),
+                                     (self.p.party_base, old_party, data[:len(old_party)]),
+                                     (self.p.party_count, bytes([len(party)]), bytes([len(rest)]))])
         return box, cell
 
     def withdraw(self, box, cell):
@@ -1237,22 +1251,27 @@ class Game:
         party = self._party_now()
         if len(party) >= PARTY_SLOTS:
             raise ValueError('Đội đã đủ %d con.' % PARTY_SLOTS)
-        c = self.read_one_box(box)[cell]
+        addrs, data = self.read_box()
+        o = (box * BOX_CAPACITY + cell) * BOX_MON_SIZE
+        c = bytes(data[o:o + BOX_MON_SIZE])
         if not 1 <= cell_species(c) <= self.p.max_species:
             raise ValueError('Ô này đang trống.')
         m = box_to_party(self.rom, c)
-        self.b.write_many([(self.p.party_base + len(party) * MON_SIZE, m.to_bytes()),
-                           (self.box_addr(box) + cell * BOX_MON_SIZE, bytes(BOX_MON_SIZE)),
-                           (self.p.party_count, bytes([len(party) + 1]))])
+        slot = self.p.party_base + len(party) * MON_SIZE
+        self._box_cas(addrs[0] - 4, [(slot, self.b.read(slot, MON_SIZE), m.to_bytes()),
+                                     (addrs[box] + cell * BOX_MON_SIZE, c, bytes(BOX_MON_SIZE)),
+                                     (self.p.party_count, bytes([len(party)]), bytes([len(party) + 1]))])
         return m
 
     def release(self, box, cell):
         """Thả con ở ô cell của box (xoá trắng ô)."""
         self._require_overworld()
-        c = self.read_one_box(box)[cell]
+        addrs, data = self.read_box()
+        o = (box * BOX_CAPACITY + cell) * BOX_MON_SIZE
+        c = bytes(data[o:o + BOX_MON_SIZE])
         if not any(c):
             raise ValueError('Ô này đang trống.')
-        self.b.write(self.box_addr(box) + cell * BOX_MON_SIZE, bytes(BOX_MON_SIZE))
+        self._box_cas(addrs[0] - 4, [(addrs[box] + cell * BOX_MON_SIZE, c, bytes(BOX_MON_SIZE))])
 
     def sort_boxes(self, by='dex'):
         """Sắp xếp cả kho (by: xem SORT_MODES), ghi các box đổi trong cùng một khung hình. Trả về số con."""
@@ -1261,13 +1280,7 @@ class Game:
         cells = [bytes(data[i:i + BOX_MON_SIZE]) for i in range(0, len(data), BOX_MON_SIZE)]
         new = sort_box_cells(self.rom, cells, by)
         self._require_overworld()
-        pairs = []
-        for i, a in enumerate(addrs):
-            row = b''.join(new[i * BOX_CAPACITY:(i + 1) * BOX_CAPACITY])
-            if row != b''.join(cells[i * BOX_CAPACITY:(i + 1) * BOX_CAPACITY]):
-                pairs.append((a, row))
-        if pairs:
-            self.b.write_many(pairs)
+        self.write_box(addrs, data, b''.join(new))
         return sum(1 for c in cells if any(c))
 
     def flags(self):
