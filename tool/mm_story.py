@@ -660,13 +660,37 @@ class Story:
                                   for f in (t['facts'] or []) if f[0] == 'need_item']
         return self._scripts[key]
 
+    # gờ nhảy một chiều (pokeemerald GetLedgeJumpDirection + MetatileBehavior_IsJump*): chỉ 4 hướng thẳng nhảy được,
+    # đi VÀO ô gờ đúng hướng gờ -> nhảy qua, đáp ô kế tiếp. Ô gờ có va chạm 1 (đo ROM 12/11: 946/946 ô) nên không đi
+    # ngược lên được; gờ chéo 0x3C-0x3F không nhảy được (coi như tường).
+    MB_JUMP = {0x38: (1, 0), 0x39: (-1, 0), 0x3A: (0, -1), 0x3B: (0, 1)}
+
+    def ledges(self, g, n):
+        """{(x, y): (dx, dy)} ô gờ trên map và hướng nhảy được qua nó."""
+        key = ('ledge', g, n)
+        if key not in self._scripts:
+            lay = self.u32(self.header(g, n))
+            w, h, _, blocks, pri, sec = struct.unpack_from('<iiIIII', self.d, self.o(lay))
+            raw = struct.unpack_from('<%dH' % (w * h), self.d, self.o(blocks))
+            kind, out = {}, {}
+            for i, v in enumerate(raw):
+                mid = v & 0x3FF
+                if mid not in kind:
+                    ts, k = (pri, mid) if mid < PRI_METAS else (sec, mid - PRI_METAS)
+                    kind[mid] = self.MB_JUMP.get(self.u16(self.u32(ts + 0x10) + 2 * k) & 0xFF)
+                if kind[mid]:
+                    out[i % w, i // w] = kind[mid]
+            self._scripts[key] = out
+        return self._scripts[key]
+
     def reach(self, g, n, starts, blocked=()):
-        """Tập ô đi bộ tới được từ các ô starts (cùng luật va chạm + độ cao như walk_path), không đi vào ô blocked.
+        """Tập ô đi bộ tới được từ các ô starts (cùng luật va chạm + độ cao + gờ nhảy như walk_path), không đi vào ô blocked.
         Duy 11/11: Route 112 phía dưới không lên thẳng mép sang Route 113 được, phải qua Fiery Path."""
         from collections import deque
         lay = self.u32(self.header(g, n))
         w, h, _, blocks = struct.unpack_from('<iiII', self.d, self.o(lay))
         raw = struct.unpack_from('<%dH' % (w * h), self.d, self.o(blocks))
+        ledge = self.ledges(g, n)
         if isinstance(starts, tuple) and len(starts) == 2 and isinstance(starts[0], int):
             starts = [starts]
         seen = {p for p in starts if 0 <= p[0] < w and 0 <= p[1] < h}
@@ -674,7 +698,12 @@ class Story:
         while q:
             p = q.popleft()
             ep = raw[p[1] * w + p[0]] >> 12
-            for nx, ny in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)):
+            for d in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = p[0] + d[0], p[1] + d[1]
+                if (nx, ny) in ledge:                         # ô gờ: chỉ nhảy đúng hướng, đáp ô sau gờ
+                    if ledge[nx, ny] != d:
+                        continue
+                    nx, ny = nx + d[0], ny + d[1]
                 if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and (nx, ny) not in blocked:
                     v = raw[ny * w + nx]
                     e = v >> 12
@@ -686,12 +715,14 @@ class Story:
     def walk_path(self, g, n, start, goals, blocked=()):
         """[(x, y)...] đường ngắn nhất từ start tới một ô trong goals trên lưới va chạm của map (Duy 11/11: vẽ đường tới
         nhiệm vụ). Ô đi được = va chạm (bit 10-11) = 0; đổi độ cao (bit 12-15) chỉ qua ô độ cao 0/15 như game (đất <-> nước
-        cần Surf). Ô đích luôn vào được (cửa, NPC). blocked = ô có NPC đứng (không đi qua). Không tính gờ nhảy một chiều.
+        cần Surf). Ô đích luôn vào được (cửa, NPC). blocked = ô có NPC đứng (không đi qua). Gờ nhảy một chiều: nhảy xuống
+        đúng hướng gờ (đường đi từ ô trước gờ thẳng tới ô đáp), không leo ngược lên (Duy 12/11).
         Theo độ cao không có đường -> thử bỏ độ cao; vẫn không -> None."""
         from collections import deque
         lay = self.u32(self.header(g, n))
         w, h, _, blocks = struct.unpack_from('<iiII', self.d, self.o(lay))
         raw = struct.unpack_from('<%dH' % (w * h), self.d, self.o(blocks))
+        ledge = self.ledges(g, n)
         goals = {p for p in goals if 0 <= p[0] < w and 0 <= p[1] < h}
         if not goals or not (0 <= start[0] < w and 0 <= start[1] < h):
             return None
@@ -706,7 +737,12 @@ class Story:
                         p = prev[p]
                     return out[::-1]
                 ep = raw[p[1] * w + p[0]] >> 12
-                for nx, ny in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)):
+                for d in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = p[0] + d[0], p[1] + d[1]
+                    if (nx, ny) in ledge and (nx, ny) not in goals:      # ô gờ: chỉ nhảy đúng hướng, đáp ô sau gờ
+                        if ledge[nx, ny] != d:
+                            continue
+                        nx, ny = nx + d[0], ny + d[1]
                     if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in prev:
                         continue
                     v = raw[ny * w + nx]

@@ -186,3 +186,10 @@
   Granite Cave, Safari), sàn nứt 0xD2 (Granite Cave, Sky Pillar, Mirage Tower). Giao diện `BIKES` + `BIKE_HOW`: khung xanh + nhãn
   "🚲 Cần MACH BIKE — chạy nhanh"; tab Việc: cách lên dốc bùn (lấy đà) / qua sàn nứt (không dừng) + ✔/⬜ có Mach Bike (259).
   t_quest_fake 51/51 (thêm cảnh Granite Cave cửa 4,21 → 12,3: qua dốc bùn 9,10-9,9 rồi sàn nứt); 9 bài khác qua.
+- Duy: "sửa luôn phần gờ nhảy một chiều". Đo ROM: 946/946 ô gờ (MB_JUMP_* 0x38-0x3F) có va chạm 1 → tool cũ coi gờ là tường:
+  KHÔNG bao giờ bảo leo ngược (lần trước nói sai), nhưng không biết nhảy xuống → đường vòng xa / báo không có đường.
+  Luật game (pokeemerald GetLedgeJumpDirection, MetatileBehavior_IsJump*): chỉ 4 gờ thẳng 0x38 Đông, 0x39 Tây, 0x3A Bắc, 0x3B Nam;
+  đi vào ô gờ đúng hướng → đáp ô sau gờ; gờ chéo 0x3C-0x3F không nhảy được.
+- `Story.ledges` + `MB_JUMP`; `walk_path` và `reach` (tìm đường theo vùng) nhảy gờ đúng hướng, đường có bước 2 ô qua gờ.
+- t_quest_fake 56/56: Lilycove gờ (45,15) nhảy xuống 2 ô, leo lên đi vòng 50 ô; reach có chỗ một chiều; quét đường thử trên ~45 map
+  không bước nào đi ngược / đứng trên gờ. 9 bài khác qua. ☐ Chưa kiểm trong game thật.

@@ -251,6 +251,36 @@ app.quest_home()
 app.update()
 check('có Mach Bike: ✔', '✔ Có Mach Bike trong túi' in app.q_text.get('1.0', 'end'))
 
+# 7) gờ nhảy một chiều (Duy 12/11): nhảy xuống đúng hướng, không leo lên
+lc = (0, 5)                                                    # LILYCOVE CITY: gờ (45,15) nhảy sang Đông
+L = st.ledges(*lc)
+check('Lilycove: gờ (45,15) hướng Đông, (46,14) hướng Nam', L.get((45, 15)) == (1, 0) and L.get((46, 14)) == (0, 1))
+down, up = st.walk_path(*lc, (44, 15), {(46, 15)}), st.walk_path(*lc, (46, 15), {(44, 15)})
+check('nhảy xuống: (44,15) -> (46,15) thẳng qua gờ', down == [(44, 15), (46, 15)])
+check('leo lên: không đi qua gờ, phải đi vòng (%d ô)' % len(up or []), up and (45, 15) not in up and len(up) > 3)
+one_way = next(((m, x, y) for m in st.maps() if m[0] == 0 for (x, y), (dx, dy) in st.ledges(*m).items()
+                if (x + dx, y + dy) in st.reach(*m, (x - dx, y - dy)) and (x - dx, y - dy) not in st.reach(*m, (x + dx, y + dy))), None)
+check('có chỗ chỉ đi được một chiều (reach): %s' % (one_way,), one_way is not None)
+bad = []
+for m in sorted({s['map'] for s in S} | {(0, n) for n in range(16, 50)}):
+    try:
+        info = st.map_info(*m)
+    except Exception:
+        continue
+    Lm, ws = st.ledges(*m), [(w['x'], w['y']) for w in info['warps']] + [(info['w'] // 2, info['h'] // 2)]
+    for a in ws[:4]:
+        for b2 in ws[:4]:
+            pth = st.walk_path(*m, a, {b2}) if a != b2 else None
+            for (x0, y0), (x1, y1) in zip(pth or [], (pth or [])[1:]):
+                dx, dy = x1 - x0, y1 - y0
+                if abs(dx) + abs(dy) == 2:                     # bước nhảy: phải qua đúng ô gờ cùng hướng
+                    ok_ = Lm.get((x0 + dx // 2, y0 + dy // 2)) == (dx // 2, dy // 2)
+                else:
+                    ok_ = abs(dx) + abs(dy) == 1 and ((x1, y1) not in Lm or (x1, y1) == b2)
+                if not ok_:
+                    bad.append((m, (x0, y0), (x1, y1)))
+check('mọi đường thử trên các map: không bước nào đi ngược / đứng trên gờ (sai: %s)' % bad[:3], not bad)
+
 app.q_guide.set(False)
 app.quest_home()
 app.update()
