@@ -196,3 +196,6 @@
 - Duy: "sửa luôn bên Emerald" (move_party ghi có điều kiện, đã làm bên FR commit 1b8f924). `Game.move_party` giống FR: con checksum sai → từ chối;
   ghi cả đội + party_count bằng write_cas, lệch thì thử lại 5 lần cách 50 ms rồi báo. dev/t_race_fake.py chép từ FR (bản cũ hai bên giống hệt):
   code cũ 5/7 (ca 7 hỏng), code mới 7/7; 10/10 bài qua. Hết chỗ ghi `W` thường vào Pokémon.
+- Choi.bat FR báo "mGBA đang chạy" vì mGBA Emerald đang mở (sửa bên FR 08bc648); bên này cùng lỗi theo chiều ngược lại → sửa giống:
+  `save_sync.mgba_running` đọc ExecutablePath + CommandLine (Get-CimInstance), chỉ tính mGBA trong thư mục game này; không đọc được /
+  đường dẫn rỗng → chặn như cũ. Thử thật (mGBA Emerald đang mở): Emerald True, thư mục FR False, `E:\PokemonR` (tiền tố) False.

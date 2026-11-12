@@ -74,13 +74,29 @@ class Sync:
         except OSError:
             return None
 
-    @staticmethod
-    def mgba_running():
+    def mgba_running(self):
+        """mGBA của CHÍNH thư mục game này đang chạy? (Duy 12/11: mGBA của tool FireRed ở thư mục khác đang mở thì
+        Choi.bat Emerald vẫn lấy save được.) Đọc đường dẫn exe + dòng lệnh từng mGBA; không đọc được thì coi mọi mGBA
+        là đang chạy như cũ (an toàn: thà không lấy save còn hơn đè mất)."""
         if os.name != 'nt' or os.environ.get('SAVE_SYNC_TEST_NO_MGBA'):   # biến này chỉ cho bài thử
             return False
+        r = subprocess.run(['powershell', '-NoProfile', '-Command',
+                            "Get-CimInstance Win32_Process -Filter \"Name='mGBA.exe'\" | "
+                            "ForEach-Object { 'P|' + $_.ExecutablePath + '|' + $_.CommandLine }"],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace', creationflags=NO_WINDOW)
+        procs = [l[2:].lower() for l in r.stdout.splitlines() if l.startswith('P|')]
+        if r.returncode or (not procs and 'mgba.exe' in self._tasklist()):
+            return 'mgba.exe' in self._tasklist()                       # không đọc được đường dẫn -> cách cũ
+        if any(not p.strip('| ') for p in procs):                       # có mGBA không đọc được đường dẫn (quyền admin)
+            return True
+        root = os.path.normcase(os.path.abspath(self.root)).rstrip('\\/') + os.sep
+        return any(root.lower() in p.replace('/', '\\') for p in procs)
+
+    @staticmethod
+    def _tasklist():
         r = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq mGBA.exe', '/NH'], capture_output=True, text=True,
                            creationflags=NO_WINDOW)
-        return 'mgba.exe' in r.stdout.lower()
+        return r.stdout.lower()
 
     # --- lệnh
     def init(self, url):
