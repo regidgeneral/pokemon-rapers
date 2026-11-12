@@ -4337,8 +4337,9 @@ class App(tk.Tk):
                  ('route_x', 'qdet'))
         T.tag_bind('qdet', '<Button-1>', lambda e: (setattr(self, 'q_map_detail', not self.q_map_detail),
                                                     self.guard(self.quest_render)()))
-        for head, entries in (guide if self.q_map_detail else ()):
-            T.insert('end', head + '\n', 'head')
+        for head, entries in guide:                           # Duy 12/11: chấm số luôn hiện trên bản đồ, chữ chỉ khi mở chi tiết
+            if self.q_map_detail:
+                T.insert('end', head + '\n', 'head')
             for e in entries:
                 nums = []
                 for r in e['rows']:
@@ -4350,6 +4351,8 @@ class App(tk.Tk):
                     nums.append(self.q_marks[id(r)][0])
                 i = len(self.q_entries)
                 self.q_entries.append(e)
+                if not self.q_map_detail:
+                    continue
                 tag = 'e%d' % i
                 lead = (''.join(self.circ(k) for k in nums[:8]) + ('…' if len(nums) > 8 else '') + ' ') if nums else '• '
                 T.insert('end', lead + e['text'] + '\n', (tag, 'done') if e['done'] else (tag,))
@@ -4389,7 +4392,7 @@ class App(tk.Tk):
             tag = 'm%d' % num
             cv.create_oval(cx - rad, cy - rad, cx + rad, cy + rad, fill=col, outline='white', width=2, tags=(tag,))
             cv.create_text(cx, cy, text=str(num), fill='white', font=('Segoe UI', 8, 'bold'), tags=(tag,))
-            cv.tag_bind(tag, '<Button-1>', lambda ev, e=e: self.quest_select(self.q_entries.index(e)))
+            cv.tag_bind(tag, '<Button-1>', lambda ev, e=e: self.quest_mark_click(self.q_entries.index(e)))
             cv.tag_bind(tag, '<Enter>', lambda ev: cv.configure(cursor='hand2'))
             cv.tag_bind(tag, '<Leave>', lambda ev: cv.configure(cursor=''))
         self.route_draw(rpath)
@@ -4406,6 +4409,13 @@ class App(tk.Tk):
         if self.q_shown != self.q_cur:
             cv.xview_moveto(0)
             cv.yview_moveto(0)
+
+    def quest_mark_click(self, i):
+        """Bấm chấm số trên bản đồ: danh sách chi tiết đang thu gọn thì mở ra trước, rồi tô dòng đó (thứ tự dòng không đổi)."""
+        if not self.q_map_detail:
+            self.q_map_detail = True
+            self.quest_render()
+        self.quest_select(i)
 
     def quest_select(self, i):
         e = self.q_entries[i]

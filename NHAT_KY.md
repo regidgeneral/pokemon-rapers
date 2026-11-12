@@ -199,3 +199,7 @@
 - Choi.bat FR báo "mGBA đang chạy" vì mGBA Emerald đang mở (sửa bên FR 08bc648); bên này cùng lỗi theo chiều ngược lại → sửa giống:
   `save_sync.mgba_running` đọc ExecutablePath + CommandLine (Get-CimInstance), chỉ tính mGBA trong thư mục game này; không đọc được /
   đường dẫn rỗng → chặn như cũ. Thử thật (mGBA Emerald đang mở): Emerald True, thư mục FR False, `E:\PokemonR` (tiền tố) False.
+- Duy: chấm số vật phẩm / đồ ẩn / trainer luôn hiện trên bản đồ (làm bên FR eeeaae6, rồi "sửa luôn bên Emerald"). quest_render luôn tính
+  q_marks + q_entries, chữ danh sách chỉ in khi mở chi tiết; bấm chấm (`quest_mark_click`) khi đang thu gọn → tự mở chi tiết rồi tô dòng.
+  t_quest_fake 58/58 (Slateport 13 chấm khi thu gọn; bỏ kiểm cũ "thu gọn thì không có chấm").
+  Thấy thêm (chưa sửa): dòng NPC Slateport "Cho: POWDER JAR ×1; DWju?????????? ×1" — tên vật phẩm rác (script cho vật phẩm theo biến?).

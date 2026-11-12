@@ -83,8 +83,19 @@ check('tab Việc: 🎯 MỤC TIÊU = chương Captain Stern, ➜ nói chuyện 
       '🎯 MỤC TIÊU: Giao Devon Goods cho Captain Stern' in txt and '➜ Vào xưởng tàu Stern, nói chuyện với Dock' in txt)
 check('tab Việc: chuỗi có ✔ Briney (xong) và ⬜ bảo tàng + ✔ Có Devon Goods trong túi',
       '✔ Nhờ ông Briney chở tới Slateport' in txt and '⬜ Vào bảo tàng tầng 2' in txt and '✔ Có Devon Goods trong túi' in txt)
-check('tab Việc: danh sách theo map thu gọn', '▸ Chi tiết map này' in txt and 'CÒN TRÊN MAP NÀY' not in txt
-      and not app.q_marks)
+check('tab Việc: danh sách theo map thu gọn', '▸ Chi tiết map này' in txt and 'CÒN TRÊN MAP NÀY' not in txt)
+# Duy 12/11: chấm số (vật phẩm / đồ ẩn / trainer...) luôn hiện trên bản đồ, danh sách chữ vẫn thu gọn
+check('chi tiết map đang thu gọn: chấm số vẫn vẽ (%d chấm)' % len(app.q_marks),
+      not app.q_map_detail and app.q_marks and app.q_cv.find_withtag('m1'))
+n1, r1, e1 = next(v for v in app.q_marks.values() if v[0] == 1)
+app.quest_mark_click(app.q_entries.index(e1))
+app.update()
+hl = app.q_text.tag_ranges('hl')
+check('bấm chấm số 1: tự mở chi tiết + tô đúng dòng (%s)' % r1['title'][:40],
+      app.q_map_detail and hl and app.circ(1) in app.q_text.get(hl[0], hl[1]))
+app.q_map_detail = False
+app.quest_render()
+app.update()
 check('tab Việc: không còn chữ chỉ hướng (mép Đông / sang phải...)',
       not any(w in txt for w in ('mép Đông', 'mép Tây', 'mép Bắc', 'mép Nam', 'sang phải', 'sang trái', 'lên trên', 'xuống dưới')))
 check('tab Việc: có chặng đường tới xưởng tàu', 'ĐƯỜNG ĐI' in txt and 'vào cửa' in txt)
