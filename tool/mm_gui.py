@@ -3284,38 +3284,53 @@ class App(tk.Tk):
                 T.tag_bind(tag, '<Button-1>', lambda ev, m=m, sx=sx, sy=sy: self.guard(self.quest_show_spot)(m, sx, sy))
         T.insert('end', '\n')
 
-    ACRO_BIKE = 272
+    # xe đạp: mã vật phẩm, tên, màu khung trên bản đồ, nhãn ngắn (Duy 12/11: vẫn vẽ đường, ghi cần xe nào + cách đi)
+    BIKES = {'acro': (272, 'ACRO BIKE', '#ff6d00', '🚲 Cần ACRO BIKE — giữ B'),
+             'mach': (259, 'MACH BIKE', '#00b0ff', '🚲 Cần MACH BIKE — chạy nhanh')}
+    BIKE_HOW = {
+        'đá nhảy': 'Đạp Acro Bike tới sát cục đá, GIỮ B cho xe dựng đầu (nhảy tại chỗ), vẫn giữ B rồi bấm hướng để nhảy '
+                   'lên từng cục. Đi bộ / Mach Bike không qua được.',
+        'đường ray': 'Đường ray trắng: đứng đầu ray trên Acro Bike, GIỮ B cho xe dựng đầu rồi bấm hướng để nhảy dọc theo ray.',
+        'dốc bùn': 'Dốc bùn: lùi ra xa vài ô, đạp Mach Bike chạy thẳng lấy đà rồi lao lên dốc, không dừng giữa chừng '
+                   '(chậm là trượt xuống). Đi bộ / Acro Bike không lên được (đi xuống thì được).',
+        'sàn nứt': 'Sàn nứt: đạp Mach Bike chạy liên tục qua, không dừng / không quay đầu trên sàn nứt (đi chậm là sàn sập, '
+                   'rơi xuống tầng dưới).',
+    }
 
-    def quest_path_acro(self, path):
-        """[(x, y)] ô trên đường tím (map đang xem) chỉ Acro Bike qua được (đá nhảy / đường ray), theo thứ tự đi."""
+    def quest_path_bike(self, path):
+        """[(x, y)] ô trên đường tím (map đang xem) chỉ xe đạp qua được (Story.bike_tiles), theo thứ tự đi."""
         if not path:
             return []
-        tiles = self.story.acro_tiles(*self.q_shown)
+        tiles = self.story.bike_tiles(*self.q_shown)
         return [p for p in path if p in tiles]
 
-    def quest_acro_text(self, T):
-        """🚲 Đường tím đi qua ô cần Acro Bike: ghi cách đi (Duy 12/11: "vẫn vẽ đường nhưng ghi cần Acro Bike, giữ B")."""
+    def quest_bike_text(self, T):
+        """🚲 Đường tím đi qua ô cần Acro / Mach Bike: ghi cần xe nào, cách đi, đã có xe chưa."""
         try:                                                  # chỗ đứng mới nhất (q_player có thể là nhịp trước)
             xy = self.game.player_xy() if self.q_shown == self.q_cur else None
         except BridgeError:
             return
         path, _ = self.quest_route_now(xy)
-        acro = self.quest_path_acro(path)
-        if not acro:
+        on = self.quest_path_bike(path)
+        if not on:
             return
-        kinds = {self.story.acro_tiles(*self.q_shown)[p] for p in acro}
-        have = self.ACRO_BIKE in (getattr(self, 'q_have', None) or ())
-        T.insert('end', '🚲 ĐƯỜNG TÍM ĐI QUA %s (khung cam, từ ô %d,%d): CẦN ACRO BIKE\n'
-                 % (' + '.join(sorted(k.upper() for k in kinds)), acro[0][0], acro[0][1]), 'head')
-        if 'đá nhảy' in kinds:
-            T.insert('end', '• Đạp xe tới sát cục đá, GIỮ B cho xe dựng đầu (nhảy tại chỗ), vẫn giữ B rồi bấm hướng để nhảy '
-                            'lên từng cục. Đi bộ / Mach Bike không qua được.\n', 'route_now')
-        if 'đường ray' in kinds:
-            T.insert('end', '• Đường ray trắng: đứng đầu ray, GIỮ B cho xe dựng đầu rồi bấm hướng để nhảy dọc theo ray.\n',
-                     'route_now')
-        T.insert('end', '%s %s\n\n' % ('✔' if have else '⬜', 'Có Acro Bike trong túi' if have else
-                                       'Chưa có Acro Bike — đổi xe ở tiệm Rydel (Mauville), miễn phí'),
-                 'done' if have else 'route')
+        tiles = self.story.bike_tiles(*self.q_shown)
+        have = getattr(self, 'q_have', None) or ()
+        for bike in ('acro', 'mach'):
+            ps = [p for p in on if tiles[p][0] == bike]
+            if not ps:
+                continue
+            item, name, _, _ = self.BIKES[bike]
+            kinds = list(dict.fromkeys(tiles[p][1] for p in ps))
+            T.insert('end', '🚲 ĐƯỜNG TÍM ĐI QUA %s (khung %s, từ ô %d,%d): CẦN %s\n'
+                     % (' + '.join(k.upper() for k in kinds), 'cam' if bike == 'acro' else 'xanh', ps[0][0], ps[0][1], name),
+                     'head')
+            for k in kinds:
+                T.insert('end', '• %s\n' % self.BIKE_HOW[k], 'route_now')
+            ok = item in have
+            T.insert('end', '%s %s\n\n' % ('✔' if ok else '⬜', 'Có %s trong túi' % name.title() if ok else
+                                           'Chưa có %s — đổi xe ở tiệm Rydel (Mauville), miễn phí' % name.title()),
+                     'done' if ok else 'route')
 
     def quest_show_spot(self, m, x, y):
         self.q_nb.select(0)
@@ -3342,15 +3357,19 @@ class App(tk.Tk):
         cv.create_line(*pts, fill='white', width=wd + 4, capstyle='round', joinstyle='round', tags='qpath')
         cv.create_line(*pts, fill='#d500f9', width=wd, capstyle='round', joinstyle='round', arrow='last',
                        arrowshape=(wd * 3, wd * 3, wd * 1.5), tags='qpath')
-        acro = self.quest_path_acro(path)                     # Duy 12/11: vẫn vẽ qua đá nhảy, nhưng ghi cần Acro Bike
-        for x, y in acro:
-            cv.create_rectangle(x * k + 1, y * k + 1, x * k + k - 1, y * k + k - 1, outline='#ff6d00', width=3,
+        on = self.quest_path_bike(path)                       # Duy 12/11: vẫn vẽ qua ô cần xe đạp, nhưng ghi cần xe nào
+        tiles = self.story.bike_tiles(*self.q_shown) if on else {}
+        first = {}
+        for x, y in on:
+            bike = tiles[x, y][0]
+            first.setdefault(bike, (x, y))
+            cv.create_rectangle(x * k + 1, y * k + 1, x * k + k - 1, y * k + k - 1, outline=self.BIKES[bike][2], width=3,
                                 dash=(4, 2), tags='qpath')
-        if acro:
-            x, y = acro[0]
+        for bike, (x, y) in first.items():
+            _, _, color, label = self.BIKES[bike]
             t = cv.create_text(x * k + k + 6, y * k + k // 2, anchor='w', fill='white', font=('Segoe UI', 9, 'bold'),
-                               text='🚲 Cần ACRO BIKE — giữ B', tags='qpath')
-            bg = cv.create_rectangle(*[a + b for a, b in zip(cv.bbox(t), (-3, -1, 3, 1))], fill='#e65100', outline='white',
+                               text=label, tags='qpath')
+            bg = cv.create_rectangle(*[a + b for a, b in zip(cv.bbox(t), (-3, -1, 3, 1))], fill=color, outline='white',
                                      tags='qpath')
             cv.tag_lower(bg, t)
         cv.tag_raise('qblk')
@@ -4550,7 +4569,7 @@ class App(tk.Tk):
             T.insert('end', 'Dẫn đường nhiệm vụ đang tắt (⚙ Cài đặt).\n', 'hint')
         T.insert('end', '\n')
         self.quest_block_text(T)
-        self.quest_acro_text(T)
+        self.quest_bike_text(T)
 
     def quest_story(self, flag=None, have=None):
         """Tab con 📖 Cốt truyện: mọi bước theo thứ tự (✔ xong, ➜ đang làm); bấm dòng = mở map + chỗ nhiệm vụ."""

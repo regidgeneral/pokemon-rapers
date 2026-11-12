@@ -586,13 +586,15 @@ class Story:
     # (cỏ cao/cỏ dài/cát sâu/hang/trong nhà/đỉnh núi/cỏ tro; nước ao/sâu/biển). CHƯA kiểm trong game (10/11).
     MB_LAND = {0x02, 0x03, 0x06, 0x08, 0x0B, 0x0C, 0x24}
     MB_WATER = {0x10, 0x11, 0x12, 0x14, 0x15}
-    # ô chỉ Acro Bike qua được (pokeemerald metatile_behaviors.h + bike.c): dốc đá nhảy (Jagged Pass) và đường ray
-    # (Route 119, Safari Zone). Va chạm = 0 nên walk_path vẫn đi qua; giao diện ghi chú "cần Acro Bike" (Duy 12/11).
-    MB_ACRO = {0xD1: 'đá nhảy', 0xD3: 'đường ray', 0xD4: 'đường ray', 0xD5: 'đường ray', 0xD6: 'đường ray'}
+    # ô chỉ xe đạp qua được (pokeemerald metatile_behaviors.h + bike.c): Acro Bike = dốc đá nhảy (Jagged Pass) và đường
+    # ray (Route 119, Safari Zone); Mach Bike = dốc bùn (Route 111/115/119, Safari) và sàn nứt (Granite Cave, Sky Pillar,
+    # Mirage Tower). Va chạm = 0 nên walk_path vẫn đi qua; giao diện ghi chú cần xe nào (Duy 12/11).
+    MB_BIKE = {0xD0: ('mach', 'dốc bùn'), 0xD1: ('acro', 'đá nhảy'), 0xD2: ('mach', 'sàn nứt'),
+               0xD3: ('acro', 'đường ray'), 0xD4: ('acro', 'đường ray'), 0xD5: ('acro', 'đường ray'), 0xD6: ('acro', 'đường ray')}
 
-    def acro_tiles(self, g, n):
-        """{(x, y): 'đá nhảy'|'đường ray'} ô cần Acro Bike trên map (theo hành vi khối, xem MB_ACRO)."""
-        key = ('acro', g, n)
+    def bike_tiles(self, g, n):
+        """{(x, y): ('acro'|'mach', loại ô)} ô cần xe đạp trên map (theo hành vi khối, xem MB_BIKE)."""
+        key = ('bike', g, n)
         if key not in self._scripts:
             lay = self.u32(self.header(g, n))
             w, h, _, blocks, pri, sec = struct.unpack_from('<iiIIII', self.d, self.o(lay))
@@ -602,7 +604,7 @@ class Story:
                 mid = v & 0x3FF
                 if mid not in kind:
                     ts, k = (pri, mid) if mid < PRI_METAS else (sec, mid - PRI_METAS)
-                    kind[mid] = self.MB_ACRO.get(self.u16(self.u32(ts + 0x10) + 2 * k) & 0xFF)
+                    kind[mid] = self.MB_BIKE.get(self.u16(self.u32(ts + 0x10) + 2 * k) & 0xFF)
                 if kind[mid]:
                     out[i % w, i // w] = kind[mid]
             self._scripts[key] = out

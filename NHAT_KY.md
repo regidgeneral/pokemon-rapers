@@ -182,3 +182,7 @@
   Tab Việc: mục 🚲 cách nhảy + ✔/⬜ có Acro Bike (mã 272), chưa có thì đổi ở Rydel. Chữ tính theo chỗ đứng đọc mới (`player_xy`).
 - t_quest_fake 45/45 (thêm 8 kiểm đúng cảnh ảnh); các bài khác qua hết. ☐ Chưa kiểm trong game thật.
 - Chưa làm (Duy chưa hỏi): ô chỉ Mach Bike (dốc bùn 0xD0, sàn nứt 0xD2), gờ nhảy một chiều.
+- Duy: "sửa luôn phần Mach Bike". Gộp thành `Story.bike_tiles` / `MB_BIKE` {hành vi: (xe, loại ô)}: Mach = dốc bùn 0xD0 (Route 111/115/119,
+  Granite Cave, Safari), sàn nứt 0xD2 (Granite Cave, Sky Pillar, Mirage Tower). Giao diện `BIKES` + `BIKE_HOW`: khung xanh + nhãn
+  "🚲 Cần MACH BIKE — chạy nhanh"; tab Việc: cách lên dốc bùn (lấy đà) / qua sàn nứt (không dừng) + ✔/⬜ có Mach Bike (259).
+  t_quest_fake 51/51 (thêm cảnh Granite Cave cửa 4,21 → 12,3: qua dốc bùn 9,10-9,9 rồi sàn nứt); 9 bài khác qua.
