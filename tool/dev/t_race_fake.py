@@ -98,5 +98,56 @@ app.heal_slots([SLOT])
 m = g.party()[SLOT]
 check('ca 4: bình thường vẫn hồi máu', m.checksum_ok and m.hp == m.maxhp)
 
+# --- move_party (Duy 12/11: ghi có điều kiện như write_mon)
+b.write(g.p.cb2_addr, struct.pack('<I', g.p.cb2_overworld))
+b.write(g.p.battle_flag[0], bytes([b.read(g.p.battle_flag[0], 1)[0] & ~g.p.battle_flag[1] & 0xFF]))
+damage()
+b._write(addr, CLEAN)
+before = [m.species for m in g.party() if not m.empty]
+raw0 = b._read(g.p.party_base, MON_SIZE * len(before))
+
+
+def party_species():
+    return [m.species for m in g.party() if not m.empty]
+
+
+# ca 5: bình thường -> đổi chỗ đúng, mọi con còn lành
+g.move_party(0, len(before) - 1)
+ps = g.party()
+check('ca 5: move_party bình thường đổi chỗ đúng', party_species() == before[1:] + before[:1]
+      and all(m.checksum_ok for m in ps if not m.empty))
+b._write(g.p.party_base, raw0)
+
+# ca 6: tool đọc trúng lúc game đang giải mã con ô 2 -> từ chối, không ghi gì
+game_xor()
+try:
+    g.move_party(0, len(before) - 1)
+    refused = False
+except ValueError:
+    refused = True
+game_xor()
+check('ca 6: đọc trúng con đang giải mã -> từ chối, đội y nguyên',
+      refused and b._read(g.p.party_base, len(raw0)) == raw0)
+
+# ca 7: game giải mã ngay sau khi tool đọc, khung sau mã hoá lại -> tool thử lại, ghi đúng, không hỏng
+calls.clear()
+if real_cas:
+    def cas_first_decrypted(items):
+        if not calls:
+            game_xor()                       # lần ghi đầu: con ô 2 đang giải mã -> CAS phải từ chối
+        res = real_cas(items)
+        if not calls:
+            game_xor()                       # khung sau: game mã hoá lại
+        calls.append(res)
+        return res
+    b._write_cas = cas_first_decrypted
+g.move_party(0, len(before) - 1)
+if real_cas:
+    b._write_cas = real_cas
+ps = g.party()
+check('ca 7: lần đầu lệch thì không ghi, thử lại ghi đúng (%s)' % calls,
+      calls[:1] == [False] and party_species() == before[1:] + before[:1] and all(m.checksum_ok for m in ps if not m.empty))
+b._write(g.p.party_base, raw0)
+
 print('%d/%d qua' % (ok, ok + fail))
 sys.exit(1 if fail else 0)

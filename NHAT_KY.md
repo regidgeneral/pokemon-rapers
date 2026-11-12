@@ -193,3 +193,6 @@
 - `Story.ledges` + `MB_JUMP`; `walk_path` và `reach` (tìm đường theo vùng) nhảy gờ đúng hướng, đường có bước 2 ô qua gờ.
 - t_quest_fake 56/56: Lilycove gờ (45,15) nhảy xuống 2 ô, leo lên đi vòng 50 ô; reach có chỗ một chiều; quét đường thử trên ~45 map
   không bước nào đi ngược / đứng trên gờ. 9 bài khác qua. ☐ Chưa kiểm trong game thật.
+- Duy: "sửa luôn bên Emerald" (move_party ghi có điều kiện, đã làm bên FR commit 1b8f924). `Game.move_party` giống FR: con checksum sai → từ chối;
+  ghi cả đội + party_count bằng write_cas, lệch thì thử lại 5 lần cách 50 ms rồi báo. dev/t_race_fake.py chép từ FR (bản cũ hai bên giống hệt):
+  code cũ 5/7 (ca 7 hỏng), code mới 7/7; 10/10 bài qua. Hết chỗ ghi `W` thường vào Pokémon.

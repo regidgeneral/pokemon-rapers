@@ -1204,14 +1204,26 @@ class Game:
             raise ValueError('Số con trong đội không khớp (%d/%d), không thao tác.' % (n, len(party)))
         return party
 
-    def move_party(self, src, dst):
-        """Chuyển con ở vị trí src tới vị trí dst của đội, các con giữa dồn lại (như "Đổi chỗ" của game nhưng chèn)."""
+    def move_party(self, src, dst, tries=5):
+        """Chuyển con ở vị trí src tới vị trí dst của đội, các con giữa dồn lại (như "Đổi chỗ" của game nhưng chèn).
+        Ghi có điều kiện như write_mon (Duy 12/11): cả đội + số con trong RAM còn y lúc đọc mới ghi; game đang giải mã
+        một con thì đợi khung sau thử lại; con đọc ra checksum sai (đọc trúng lúc giải mã) thì không ghi."""
         self._require_overworld()
         party = self._party_now()
         if not (0 <= src < len(party) and 0 <= dst < len(party)):
             raise ValueError('Vị trí ngoài đội (%d con).' % len(party))
+        bad = [i + 1 for i, m in enumerate(party) if not m.checksum_ok]
+        if bad:
+            raise ValueError('Ô %s đọc lúc game đang xử lý (checksum sai), hãy tải lại.' % ', '.join(map(str, bad)))
+        old = b''.join(bytes(m.enc) for m in party)
         party.insert(dst, party.pop(src))
-        self.b.write(self.p.party_base, b''.join(bytes(m.enc) for m in party))   # byte gốc trong RAM, không mã hoá lại
+        new = b''.join(bytes(m.enc) for m in party)                # byte gốc trong RAM, không mã hoá lại
+        n = bytes([len(party)])
+        for _ in range(tries):
+            if self.b.write_cas([(self.p.party_base, old, new), (self.p.party_count, n, n)]):
+                return
+            time.sleep(0.05)
+        raise ValueError('Đội vừa đổi trong game, hãy tải lại rồi thử lại.')
 
     def move_item(self, idx, src, dst):
         """Chuyển món ở vị trí src tới vị trí dst trong ngăn túi idx, các món giữa dồn lại; số lượng giữ nguyên."""
