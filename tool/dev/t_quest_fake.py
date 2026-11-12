@@ -186,6 +186,41 @@ app.quest_pick_go((S[mf]['map'], (1, 1), 'thử'))
 check('bấm 🧭 một dòng: đường tím đổi theo', app.guide_goal() == (S[mf]['map'], (1, 1), 'thử'))
 g.party = real_party
 
+# 5) đúng ảnh Duy 12/11: Jagged Pass phía dưới, đường tím đi lên qua đá nhảy -> vẫn vẽ, ghi cần Acro Bike, giữ B
+jp = (24, 13)
+check('Acro Bike = mã 272 trong ROM (%s)' % r.item_name(app.ACRO_BIKE), r.item_name(app.ACRO_BIKE) == 'ACRO BIKE')
+acro = st.acro_tiles(*jp)
+check('Jagged Pass có ô đá nhảy (21,27..30)', all(acro.get((21, y)) == 'đá nhảy' for y in range(27, 31)))
+check('Route 119 có đường ray', 'đường ray' in st.acro_tiles(0, 34).values())
+full = st.walk_path(*jp, (14, 40), {(13, 5), (14, 5)})
+me = full[full.index((21, 29)) - 1]                            # đứng ngay dưới đá nhảy
+b.write(sb1 + p.loc_off, bytes(jp))
+b.write(p.player_obj + 0x10, struct.pack('<hh', me[0] + 7, me[1] + 7))
+b.write(kp + 4, bytes(4))                                     # chưa có Acro Bike
+app.quest_pick_go((jp, (13, 5), 'thử'))
+app.quest_home()
+app.update()
+txt = app.q_text.get('1.0', 'end')
+lines = [i for i in app.q_cv.find_withtag('qpath') if app.q_cv.type(i) == 'line' and app.q_cv.itemcget(i, 'fill') == '#d500f9']
+co = app.q_cv.coords(lines[0]) if lines else []
+k = app.q_scale * 16                                          # tỉ lệ của map này
+on = {tuple(int((c - k // 2) // k) for c in co[j:j + 2]) for j in range(0, len(co), 2)}
+check('vẫn vẽ đường tím đi qua đá nhảy từ %s' % (me,),co[:2] == [me[0] * k + k // 2, me[1] * k + k // 2] and (21, 29) in on)
+labels = [app.q_cv.itemcget(i, 'text') for i in app.q_cv.find_withtag('qpath') if app.q_cv.type(i) == 'text']
+check('bản đồ: nhãn "🚲 Cần ACRO BIKE — giữ B"', '🚲 Cần ACRO BIKE — giữ B' in labels)
+check('bản đồ: khung cam trên ô đá nhảy', sum(1 for i in app.q_cv.find_withtag('qpath') if app.q_cv.type(i) == 'rectangle'
+                                            and app.q_cv.itemcget(i, 'outline') == '#ff6d00') >= 3)
+check('tab Việc: CẦN ACRO BIKE + giữ B + ⬜ chưa có (đổi ở Rydel)',
+      'CẦN ACRO BIKE' in txt and 'GIỮ B' in txt and '⬜ Chưa có Acro Bike — đổi xe ở tiệm Rydel' in txt)
+b.write(kp + 4, struct.pack('<HH', app.ACRO_BIKE, 1 ^ key16))   # có Acro Bike
+app.quest_home()
+app.update()
+check('có Acro Bike: ✔', '✔ Có Acro Bike trong túi' in app.q_text.get('1.0', 'end'))
+b.write(p.player_obj + 0x10, struct.pack('<hh', 14 + 7, 8 + 7))  # trên đỉnh, đường xuống cửa Mt. Chimney không qua đá
+app.quest_home()
+app.update()
+check('đường không qua đá nhảy: không ghi Acro Bike', 'CẦN ACRO BIKE' not in app.q_text.get('1.0', 'end'))
+
 app.q_guide.set(False)
 app.quest_home()
 app.update()

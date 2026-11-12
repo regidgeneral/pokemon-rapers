@@ -173,3 +173,12 @@
   có bản sạch: 24/24 đúng y). Grimer có lại SLUDGE. Ghi có điều kiện, đọc lại 30/30 checksum đúng; byte đầu kho = 0.
   Save trước khi cứu: save_backup\20261111-truoc_cuu_box1.sav. ☐ Duy lưu game + mở lại tool bản mới.
 - FR: deposit/withdraw/... cùng kiểu ghi thường (FR cũng dời SaveBlock); FR chưa ghi kho sau trận nên ít gặp. Chưa sửa bên FR.
+
+## 2026-11-12
+- Duy gửi ảnh Jagged Pass: đường tím đi thẳng lên qua mấy cục đá nhảy, hỏi qua bằng cách nào. Duy chốt: "vẫn vẽ đường nhưng ghi cần Acro Bike, giữ B".
+- Nguyên nhân: đá nhảy có hành vi MB_BUMPY_SLOPE 0xD1, va chạm = 0 nên walk_path coi như ô đi bộ. Đường ray Acro Bike 0xD3-0xD6 cũng vậy
+  (pokeemerald metatile_behaviors.h, src/bike.c). Quét ROM: đá nhảy ở Jagged Pass (14 ô) + Safari Zone; đường ray ở Route 119 + Safari Zone.
+- `Story.acro_tiles` + `MB_ACRO`. Bản đồ: khung cam đứt nét trên ô cần Acro Bike + nhãn "🚲 Cần ACRO BIKE — giữ B".
+  Tab Việc: mục 🚲 cách nhảy + ✔/⬜ có Acro Bike (mã 272), chưa có thì đổi ở Rydel. Chữ tính theo chỗ đứng đọc mới (`player_xy`).
+- t_quest_fake 45/45 (thêm 8 kiểm đúng cảnh ảnh); các bài khác qua hết. ☐ Chưa kiểm trong game thật.
+- Chưa làm (Duy chưa hỏi): ô chỉ Mach Bike (dốc bùn 0xD0, sàn nứt 0xD2), gờ nhảy một chiều.
